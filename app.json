@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Staff App",
+    "slug": "staff-app-native",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#161826",
+    "splash": {
+      "backgroundColor": "#161826"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "backgroundColor": "#161826"
+    },
+    "android": {
+      "backgroundColor": "#161826"
+    },
+    "web": {
+      "backgroundColor": "#161826"
+    }
+  }
+}
