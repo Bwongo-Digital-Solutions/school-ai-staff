@@ -1,0 +1,357 @@
+/* Client for the school-ai-search backend.
+   A mirror of the web app's client: the same endpoints, the same argument
+   names, the same return shapes. The only differences are storage
+   (AsyncStorage rather than localStorage, so the base is hydrated once at
+   boot and mirrored synchronously) and the payload scrub below. */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BASE_KEY = 'kps.apiBase';
+const DEFAULT_BASE = '';
+const TIMEOUT = 15000;
+
+/* AsyncStorage is async but call sites need the base synchronously, so the
+   stored value is mirrored here and hydrated once at boot. */
+let baseUrl = DEFAULT_BASE;
+
+export const api = {
+  base() {
+    return baseUrl;
+  },
+  async load() {
+    try {
+      baseUrl = (await AsyncStorage.getItem(BASE_KEY)) || DEFAULT_BASE;
+    } catch {
+      baseUrl = DEFAULT_BASE;
+    }
+    return baseUrl;
+  },
+  async setBase(url) {
+    const clean = String(url || '').trim().replace(/\/+$/, '');
+    baseUrl = clean;
+    try {
+      await AsyncStorage.setItem(BASE_KEY, clean);
+    } catch {
+      /* storage unavailable — the in-memory base still applies this session */
+    }
+    return clean;
+  },
+  configured() {
+    return !!baseUrl;
+  },
+};
+
+class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/* A QR reader, a keyboard wedge or a pasted value can carry NUL and other C0
+   control bytes. Postgres rejects NUL in text outright and the rest survive as
+   invisible junk in a log somebody has to read later, so every string leaving
+   the app is scrubbed of them. Tab, newline and carriage return are kept —
+   they are legitimate inside a note. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+function scrub(value) {
+  if (typeof value === 'string') return value.replace(CONTROL_CHARS, '');
+  if (Array.isArray(value)) return value.map(scrub);
+  if (value && typeof value === 'object') {
+    const out = {};
+    Object.keys(value).forEach((key) => {
+      out[key.replace(CONTROL_CHARS, '')] = scrub(value[key]);
+    });
+    return out;
+  }
+  return value;
+}
+
+async function request(path, init, { timeout = TIMEOUT } = {}) {
+  if (!baseUrl) {
+    throw new ApiError('No server configured. Open Server settings and enter your API address.', 0);
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  let res;
+  try {
+    res = await fetch(baseUrl + path, { ...init, signal: ctrl.signal });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err && err.name === 'AbortError') {
+      throw new ApiError('The server took too long to respond.', 0);
+    }
+    throw new ApiError('Cannot reach the server. Check the address and your connection.', 0);
+  }
+  clearTimeout(timer);
+
+  let payload = null;
+  try {
+    payload = await res.json();
+  } catch {
+    /* non-JSON error page */
+  }
+
+  if (!res.ok || (payload && payload.error)) {
+    throw new ApiError((payload && payload.error) || `Server error (${res.status})`, res.status);
+  }
+  return payload ? payload.data : undefined;
+}
+
+function post(path, body, options) {
+  return request(
+    path,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scrub(body || {})),
+    },
+    options,
+  );
+}
+
+function get(path, options) {
+  return request(path, { method: 'GET' }, options);
+}
+
+/* The gateway takes `columns` as a comma-separated string, and only supports
+   an `eq` filter operator — no substring matching, which is why name search
+   filters client-side over the fetched list. */
+function dbSelect({ table, columns, filters = [], orderBy, limit, single = false }) {
+  return post('/api/db', {
+    table,
+    operation: 'select',
+    columns: Array.isArray(columns) ? columns.join(',') : columns,
+    filters,
+    orderBy,
+    limit,
+    single,
+  });
+}
+
+const STUDENT_COLUMNS = [
+  'id', 'student_id', 'first_name', 'last_name', 'grade_level', 'class_section',
+  'gender', 'date_of_birth', 'email', 'phone', 'parent_name', 'parent_phone',
+  'parent_email', 'address', 'status', 'gpa', 'attendance_rate', 'blood_group',
+  'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+  'lifecycle_status', 'subjects', 'notes', 'enrollment_date',
+];
+
+/* React Native's URL has no usable `searchParams`, so the query string and the
+   path are picked apart by hand. The result is the same as the web client's
+   for every input the two share. */
+function fromUrl(text) {
+  const match = text.match(/^https?:\/\/[^/?#]*([^?#]*)(?:\?([^#]*))?/i);
+  if (!match) return '';
+  const path = match[1] || '';
+  const query = match[2] || '';
+
+  const params = {};
+  query.split('&').forEach((pair) => {
+    if (!pair) return;
+    const eq = pair.indexOf('=');
+    const rawKey = eq === -1 ? pair : pair.slice(0, eq);
+    const rawValue = eq === -1 ? '' : pair.slice(eq + 1);
+    try {
+      params[decodeURIComponent(rawKey.replace(/\+/g, ' '))] =
+        decodeURIComponent(rawValue.replace(/\+/g, ' '));
+    } catch {
+      /* a malformed escape means this pair is not the one we want */
+    }
+  });
+
+  const fromQuery = params.student_id || params.studentId || params.id;
+  if (fromQuery) return fromQuery.trim();
+
+  const lastSegment = path.split('/').filter(Boolean).pop();
+  if (lastSegment) {
+    try {
+      return decodeURIComponent(lastSegment).trim();
+    } catch {
+      return lastSegment.trim();
+    }
+  }
+  return '';
+}
+
+/**
+ * Normalises a scanned ID card payload down to the student number.
+ * Mirrors `parseStudentCode` in the backend — keep the two in step. The server re-parses
+ * whatever it receives, so this copy only shortens the round trip for manual entry.
+ */
+export function parseStudentCode(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (!text) return '';
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      const fromJson = parsed.student_id || parsed.studentId || parsed.id || parsed.code;
+      if (fromJson) return String(fromJson).trim();
+    } catch {
+      /* treat as plain text */
+    }
+  }
+
+  if (/^https?:\/\//i.test(text)) {
+    const fromLink = fromUrl(text);
+    if (fromLink) return fromLink;
+  }
+
+  return text;
+}
+
+export const schoolApi = {
+  health: () => get('/api/health'),
+
+  signIn: (email, password) =>
+    post('/api/functions/auth', { action: 'signin', email, password })
+      .then((d) => (d ? d.user : null)),
+
+  /** The scan payload, already trimmed by the server to this profile's sections. */
+  studentCard: (code, role, designation) =>
+    post('/api/functions/student-card', { code, role, designation }),
+
+  recordGatePass: ({ code, direction, decision, authorisedBy, reason, destination, note, recordedBy }) =>
+    post('/api/functions/gate-pass', {
+      code, direction, decision, authorisedBy, reason, destination, note, recordedBy,
+    }),
+
+  grantGatePermission: ({ code, reason, destination, expectedReturn, grantedBy, grantedByEmail }) =>
+    post('/api/functions/gate-permission', {
+      action: 'grant', code, reason, destination, expectedReturn, grantedBy, grantedByEmail,
+    }),
+
+  cancelGatePermission: ({ permissionId, by }) =>
+    post('/api/functions/gate-permission', { action: 'cancel', permissionId, by }),
+
+  /** The gate's movement log: who went which way, when, and whether they were let through. */
+  gateLog: ({ date, limit } = {}) => post('/api/functions/gate-log', { date, limit }),
+
+  inbox: ({ actorEmail, limit } = {}) =>
+    post('/api/functions/messages', { action: 'inbox', actorEmail, limit }),
+
+  staffDirectory: ({ actorEmail }) =>
+    post('/api/functions/messages', { action: 'staff', actorEmail }),
+
+  sendMessage: ({ actorEmail, audienceKind, audienceValue, recipientEmail, subject, body, priority }) =>
+    post('/api/functions/messages', {
+      action: 'send', actorEmail, audienceKind, audienceValue, recipientEmail, subject, body, priority,
+    }),
+
+  markMessageRead: ({ actorEmail, messageId }) =>
+    post('/api/functions/messages', { action: 'read', actorEmail, messageId }),
+
+  markAllMessagesRead: ({ actorEmail }) =>
+    post('/api/functions/messages', { action: 'read_all', actorEmail }),
+
+  rollCallClasses: () =>
+    post('/api/functions/roll-call', { action: 'classes' }).then((d) => (d && d.classes) || []),
+
+  rollCallRegister: ({ gradeLevel, classSection, date }) =>
+    post('/api/functions/roll-call', { action: 'register', gradeLevel, classSection, date }),
+
+  markAttendance: ({ code, status, date, reason, markedBy }) =>
+    post('/api/functions/roll-call', { action: 'mark', code, status, date, reason, markedBy }),
+
+  grantExamClearance: ({ code, note, grantedBy, grantedByEmail, validUntil }) =>
+    post('/api/functions/exam-clearance', {
+      action: 'grant', code, note, grantedBy, grantedByEmail, validUntil,
+    }),
+
+  revokeExamClearance: ({ clearanceId, by }) =>
+    post('/api/functions/exam-clearance', { action: 'revoke', clearanceId, by }),
+
+  /** The invigilator's verdict at the exam room door. */
+  admitToExam: ({ code, decision, note, recordedBy }) =>
+    post('/api/functions/exam-clearance', { action: 'admit', code, decision, note, recordedBy }),
+
+  /* The assistant and search are refused server-side for anyone but an admin or teacher,
+     so `requesterRole` is passed through rather than trusted from the UI alone. */
+  aiModels: () => post('/api/functions/ai-models', {}).then((d) => (d && d.models) || []),
+
+  aiChat: ({ message, conversationId, modelId, requesterRole, actorName, actorEmail }) =>
+    post('/api/functions/ai-chat', {
+      message, conversationId, modelId, requesterRole, actorName, actorEmail,
+    }, { timeout: 60000 }),
+
+  search: ({ query, requesterRole, actorName, actorEmail, limit }) =>
+    post('/api/functions/search', {
+      action: 'query', query, requesterRole, actorName, actorEmail, limit,
+    }, { timeout: 25000 }),
+
+  recordMeal: ({ code, meal, servedBy }) =>
+    post('/api/functions/meal-record', { code, meal, servedBy }),
+
+  listStudents: () =>
+    dbSelect({
+      table: 'students',
+      columns: STUDENT_COLUMNS,
+      orderBy: { field: 'last_name', ascending: true },
+    }),
+
+  /** Looks up by the human-facing student number (e.g. STU-2026-011). */
+  studentByNumber: (studentNumber) =>
+    dbSelect({
+      table: 'students',
+      columns: STUDENT_COLUMNS,
+      filters: [{ field: 'student_id', operator: 'eq', value: studentNumber }],
+      single: true,
+    }),
+
+  studentById: (id) =>
+    dbSelect({
+      table: 'students',
+      columns: STUDENT_COLUMNS,
+      filters: [{ field: 'id', operator: 'eq', value: id }],
+      single: true,
+    }),
+
+  feeStatus: () =>
+    post('/api/functions/fee-status', {}).then((d) => (d && d.students) || []),
+
+  invoicesFor: (studentId) =>
+    dbSelect({
+      table: 'invoices',
+      columns: ['id', 'invoice_number', 'status', 'total_amount', 'balance_due', 'currency', 'due_date', 'issued_at'],
+      filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
+    }),
+
+  paymentsFor: (studentId) =>
+    dbSelect({
+      table: 'payments',
+      columns: ['id', 'amount', 'currency', 'paid_at', 'payment_method', 'reference'],
+      filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
+      orderBy: { field: 'paid_at', ascending: false },
+    }),
+
+  attendanceFor: (studentId) =>
+    dbSelect({
+      table: 'attendance_records',
+      columns: ['id', 'attendance_date', 'status', 'reason'],
+      filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
+      orderBy: { field: 'attendance_date', ascending: false },
+      limit: 40,
+    }),
+
+  gradesFor: (studentId) =>
+    dbSelect({
+      table: 'gradebook_entries',
+      columns: ['id', 'exam_id', 'subject_id', 'score', 'max_score', 'grade', 'remarks', 'rank'],
+      filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
+    }),
+
+  disciplineFor: (studentId) =>
+    dbSelect({
+      table: 'discipline_records',
+      columns: ['id', 'incident_date', 'category', 'severity', 'description', 'action_taken', 'status'],
+      filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
+      orderBy: { field: 'incident_date', ascending: false },
+    }),
+};
+
+export { ApiError };

@@ -4,23 +4,46 @@
     "slug": "staff-app-native",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#161826",
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#161826"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Staff App to use the camera to scan student ID cards.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": false,
-      "backgroundColor": "#161826"
+      "backgroundColor": "#161826",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Staff App to use the camera to scan student ID cards."
+      }
     },
     "android": {
-      "backgroundColor": "#161826"
+      "backgroundColor": "#161826",
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2b2741"
+      }
     },
     "web": {
-      "backgroundColor": "#161826"
+      "backgroundColor": "#161826",
+      "favicon": "./assets/favicon.png"
     }
   }
 }
