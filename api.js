@@ -14,6 +14,18 @@ const TIMEOUT = 15000;
    stored value is mirrored here and hydrated once at boot. */
 let baseUrl = DEFAULT_BASE;
 
+/* A bare host, or `host:port`, is what people actually type. React Native's
+   fetch rejects a URL with no scheme outright, and that surfaces as the same
+   "cannot reach the server" as a wrong address, so the scheme is filled in
+   here. http is the default because a LAN server reached by IP rarely has a
+   certificate — note that plain http also needs `usesCleartextTraffic` on the
+   Android side, which app.json sets via expo-build-properties. */
+function normaliseBase(url) {
+  const text = String(url || '').trim().replace(/\/+$/, '');
+  if (!text) return '';
+  return /^[a-z][a-z0-9+.\-]*:\/\//i.test(text) ? text : `http://${text}`;
+}
+
 export const api = {
   base() {
     return baseUrl;
@@ -27,7 +39,7 @@ export const api = {
     return baseUrl;
   },
   async setBase(url) {
-    const clean = String(url || '').trim().replace(/\/+$/, '');
+    const clean = normaliseBase(url);
     baseUrl = clean;
     try {
       await AsyncStorage.setItem(BASE_KEY, clean);
@@ -85,7 +97,7 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
     if (err && err.name === 'AbortError') {
       throw new ApiError('The server took too long to respond.', 0);
     }
-    throw new ApiError('Cannot reach the server. Check the address and your connection.', 0);
+    throw new ApiError(`Cannot reach ${baseUrl}. Check the address and your connection.`, 0);
   }
   clearTimeout(timer);
 
