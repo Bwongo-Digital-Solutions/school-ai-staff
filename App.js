@@ -355,7 +355,9 @@ function Root() {
       timer = null;
     };
 
-    if (AppState.currentState === 'active') start();
+    /* 'unknown' is what some devices report before the first change event; only a
+       genuinely backgrounded app should sit idle. */
+    if (AppState.currentState !== 'background') start();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         refreshInbox();

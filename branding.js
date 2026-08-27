@@ -58,12 +58,15 @@ export function BrandingProvider({ children }) {
   const [branding, setBranding] = useState(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const cancelled = useRef(false);
+  /* The cache read and the first server refresh are started together, so the cache can
+     resolve second and would otherwise overwrite fresher branding with older. */
+  const fromServer = useRef(false);
 
   useEffect(() => {
     cancelled.current = false;
     AsyncStorage.getItem(CACHE_KEY)
       .then((raw) => {
-        if (cancelled.current || !raw) return;
+        if (cancelled.current || fromServer.current || !raw) return;
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') setBranding({ ...EMPTY, ...normalise(parsed) });
       })
@@ -83,6 +86,7 @@ export function BrandingProvider({ children }) {
       const settings = await schoolApi.schoolSettings();
       if (cancelled.current || !settings) return;
       const next = normalise(settings);
+      fromServer.current = true;
       setBranding(next);
       setLoaded(true);
       const cacheable = next.logo.length <= MAX_CACHED_LOGO ? next : { ...next, logo: '' };
