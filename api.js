@@ -82,6 +82,20 @@ function scrub(value) {
   return value;
 }
 
+/* What to show after "Cannot reach …". A bare "Network request failed" says nothing a user
+   can act on, so it is translated; anything more specific is passed through, because a
+   handshake or certificate message is the thing worth reading. */
+function reasonFor(error) {
+  const detail = String((error && error.message) || '').trim();
+  if (!detail || /network request failed/i.test(detail)) {
+    return 'nothing answered at that address. Check the server is running and reachable from this phone.';
+  }
+  if (/certificat|ssl|tls|handshake|trust anchor|x509/i.test(detail)) {
+    return `the secure connection was refused: ${detail}`;
+  }
+  return detail;
+}
+
 async function request(path, init, { timeout = TIMEOUT } = {}) {
   if (!baseUrl) {
     throw new ApiError('No server configured. Open Server settings and enter your API address.', 0);
@@ -97,7 +111,13 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
     if (err && err.name === 'AbortError') {
       throw new ApiError('The server took too long to respond.', 0);
     }
-    throw new ApiError(`Cannot reach ${baseUrl}. Check the address and your connection.`, 0);
+    /* Say what actually went wrong. The generic sentence sent people to check an address
+       that was correct, while the real cause — most often a TLS handshake Android refuses
+       and a browser papers over — was thrown away here. React Native reports "Network
+       request failed" for an ordinary unreachable host and, on Android, surfaces the
+       underlying exception text for a certificate or handshake failure, which is exactly
+       what tells the two apart. */
+    throw new ApiError(`Cannot reach ${baseUrl} — ${reasonFor(err)}`, 0);
   }
   clearTimeout(timer);
 
