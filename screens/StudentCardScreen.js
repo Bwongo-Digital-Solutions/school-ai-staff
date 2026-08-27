@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import {
   Bed,
   BookOpen,
@@ -14,6 +14,7 @@ import {
   Coins,
   Cookie,
   EnvelopeSimple,
+  Export,
   FirstAidKit,
   IdentificationCard,
   MapPin,
@@ -28,7 +29,7 @@ import {
   X,
 } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
-import { schoolApi, ApiError } from '../api';
+import { schoolApi, ApiError, receiptUrl } from '../api';
 import { designationOf } from '../roles';
 import { dateTime, formatDate, humanise, money } from '../format';
 import Card from '../components/Card';
@@ -42,12 +43,14 @@ import PermissionSlip from '../components/PermissionSlip';
 import MovementList from '../components/MovementList';
 import StudentHeader from '../components/StudentHeader';
 import Field, { FormError } from '../components/Field';
-import { useToast } from '../components/Toast';
+import { alertSuccess, alertWarning, alertError } from '../alerts';
+import { shareDocument } from '../share';
 
 /* The server sends only the sections this profile may see, so rendering walks the section
    list it returns. An unknown section is skipped rather than guessed at. */
 const SECTION_RENDERERS = {
   fees: FeesSection,
+  payments: PaymentsSection,
   exam_clearance: ExamSection,
   exam_clearance_grant: ExamGrantSection,
   roll_call: RollCallSection,
@@ -62,7 +65,7 @@ const SECTION_RENDERERS = {
   meal_card: MealCardSection,
 };
 
-export default function StudentCardScreen({ code, user, onBack }) {
+export default function StudentCardScreen({ code, user, onBack, onSendReport }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -108,10 +111,23 @@ export default function StudentCardScreen({ code, user, onBack }) {
   }
 
   const student = card.student;
+  /* Reports carry marks and payment history, so the server only builds one for staff who
+     already hold the roster. Offering the button to anyone else would be a dead end. */
+  const canSendReport = !!onSendReport && ['admin', 'teacher'].includes((user && user.role) || '');
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title={student.full_name} onBack={onBack} />
+      <ScreenHeader
+        title={student.full_name}
+        onBack={onBack}
+        right={
+          canSendReport ? (
+            <Pressable onPress={() => onSendReport(card)} hitSlop={12} accessibilityLabel="Send a report">
+              <Export size={22} color={colors.text} weight="regular" />
+            </Pressable>
+          ) : null
+        }
+      />
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.scrollContent}
@@ -182,6 +198,80 @@ function FeesSection({ card }) {
   );
 }
 
+/* ── payment history ───────────────────────────────────────────────── */
+
+/* The ledger behind the fees balance. Every payment the school has recorded, newest first,
+   and the receipt it issued — which a parent who is querying a balance will ask for by
+   number, so it is shown and can be handed straight back to them. */
+function PaymentsSection({ card, user }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [busy, setBusy] = useState('');
+
+  const p = card.payments;
+  if (!p) return null;
+
+  const shareReceipt = async (entry) => {
+    setBusy(entry.id);
+    try {
+      await shareDocument(
+        receiptUrl({ paymentId: entry.id, requesterRole: (user && user.role) || '' }),
+        `${entry.receipt_number || 'receipt'}.pdf`,
+        { title: `Receipt ${entry.receipt_number}` },
+      );
+    } catch (err) {
+      alertError('Receipt not shared', err);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <>
+      <SectionLabel>Payment history</SectionLabel>
+      <Card style={styles.sectionCard}>
+        <View style={styles.spread}>
+          <Text style={styles.caption}>Total received</Text>
+          <Text style={styles.bigValue}>{money(p.total_paid, p.currency)}</Text>
+        </View>
+        <Text style={styles.meta}>
+          {p.count === 0
+            ? 'Nothing has been paid against this student yet.'
+            : `${p.count} payment${p.count === 1 ? '' : 's'} recorded`}
+        </Text>
+
+        {p.entries.map((entry) => (
+          <View key={entry.id} style={styles.ledgerRow}>
+            <View style={styles.ledgerLeft}>
+              <Text style={styles.ledgerAmount}>{money(entry.amount, entry.currency)}</Text>
+              <Text style={styles.ledgerMeta} numberOfLines={1}>
+                {[formatDate(entry.paid_at), entry.method, entry.reference]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+              {entry.receipt_number ? (
+                <Text style={styles.ledgerReceipt}>{entry.receipt_number}</Text>
+              ) : (
+                <Text style={styles.ledgerReceipt}>No receipt issued</Text>
+              )}
+            </View>
+            {entry.receipt_number ? (
+              <Button
+                label={busy === entry.id ? 'Opening…' : 'Share'}
+                icon={Export}
+                variant="ghost"
+                onPress={() => shareReceipt(entry)}
+                loading={busy === entry.id}
+                disabled={!!busy}
+              />
+            ) : null}
+          </View>
+        ))}
+      </Card>
+    </>
+  );
+}
+
 /* ── roll call on a scanned card ───────────────────────────────────── */
 
 const ATTENDANCE_TONE = {
@@ -191,7 +281,6 @@ const ATTENDANCE_TONE = {
 function RollCallSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -214,14 +303,15 @@ function RollCallSection({ card, user, reload }) {
       if (!res || !res.record || res.record.status !== status) {
         throw new ApiError('The server did not confirm the mark. Nothing was saved.', 0);
       }
-      toast(`Marked ${status}`);
+      alertSuccess(`Marked ${status}`);
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no roll call endpoint. It is running an older build than this app.'
-          : `Not saved — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not saved — ${detail}`);
+      alertError('Not saved', detail);
       setBusy(false);
     }
   };
@@ -283,7 +373,6 @@ function RollCallSection({ card, user, reload }) {
 function ExamSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -306,10 +395,11 @@ function ExamSection({ card, user, reload }) {
         note: trimmed,
         recordedBy: (user && user.display_name) || '',
       });
-      toast(decision === 'approved' ? 'Admitted to the exam' : 'Turned away');
+      alertSuccess(decision === 'approved' ? 'Admitted to the exam' : 'Turned away');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not recorded', err);
       setBusy(false);
     }
   };
@@ -394,7 +484,6 @@ function ExamSection({ card, user, reload }) {
 function ExamGrantSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -410,10 +499,10 @@ function ExamGrantSection({ card, user, reload }) {
           clearanceId: g.active.id,
           by: (user && user.display_name) || '',
         });
-        toast('Clearance revoked');
+        alertSuccess('Clearance revoked');
         reload();
       } catch (err) {
-        toast(err.message);
+        alertError('Not revoked', err);
         setBusy(false);
       }
     };
@@ -451,10 +540,11 @@ function ExamGrantSection({ card, user, reload }) {
         grantedBy: (user && user.display_name) || '',
         grantedByEmail: (user && user.auth_email) || '',
       });
-      toast('Clearance granted');
+      alertSuccess('Clearance granted');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not granted', err);
       setBusy(false);
     }
   };
@@ -754,7 +844,6 @@ function GatePassSection({ card, user, reload }) {
 function ExitDecision({ card, gate, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [authorisedBy, setAuthorisedBy] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -792,14 +881,15 @@ function ExitDecision({ card, gate, user, reload }) {
       if (!res || !res.pass || res.pass.decision !== decision) {
         throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
       }
-      toast(decision === 'approved' ? 'Exit approved' : 'Exit declined');
+      alertSuccess(decision === 'approved' ? 'Exit approved' : 'Exit declined');
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : `Not recorded — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
+      alertError('Not recorded', detail);
       setBusy(false);
     }
   };
@@ -883,7 +973,6 @@ function ExitDecision({ card, gate, user, reload }) {
 function RecordReturn({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -900,14 +989,15 @@ function RecordReturn({ card, user, reload }) {
       if (!res || !res.pass || res.pass.decision !== 'approved') {
         throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
       }
-      toast('Return recorded');
+      alertSuccess('Return recorded');
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : `Not recorded — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
+      alertError('Not recorded', detail);
       setBusy(false);
     }
   };
@@ -932,7 +1022,6 @@ function RecordReturn({ card, user, reload }) {
 function GatePermissionSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [reason, setReason] = useState('');
   const [destination, setDestination] = useState('');
   const [expectedReturn, setExpectedReturn] = useState('');
@@ -951,10 +1040,10 @@ function GatePermissionSection({ card, user, reload }) {
           permissionId: active.id,
           by: (user && user.display_name) || '',
         });
-        toast('Permission cancelled');
+        alertSuccess('Permission cancelled');
         reload();
       } catch (err) {
-        toast(err.message);
+        alertError('Not cancelled', err);
         setBusy(false);
       }
     };
@@ -1009,10 +1098,11 @@ function GatePermissionSection({ card, user, reload }) {
         grantedBy: (user && user.display_name) || '',
         grantedByEmail: (user && user.auth_email) || '',
       });
-      toast('Permission granted');
+      alertSuccess('Permission granted');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not granted', err);
       setBusy(false);
     }
   };
@@ -1069,7 +1159,6 @@ const MEAL_ICONS = { breakfast: Coffee, lunch: BowlFood, supper: Cookie };
 function MealCardSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [busy, setBusy] = useState('');
 
   const m = card.meal_card;
@@ -1083,10 +1172,11 @@ function MealCardSection({ card, user, reload }) {
         meal,
         servedBy: (user && user.display_name) || '',
       });
-      toast(res.already_served ? 'Already served today' : `${humanise(meal)} recorded`);
+      if (res.already_served) alertWarning('Already served today');
+      else alertSuccess(`${humanise(meal)} recorded`);
       reload();
     } catch (err) {
-      toast(err.message);
+      alertError('Not recorded', err);
       setBusy('');
     }
   };
@@ -1186,6 +1276,36 @@ const createStyles = (colors) =>
       fontFamily: fonts.medium,
       fontSize: 20,
       color: colors.text,
+    },
+    ledgerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: colors.neutral[800],
+      paddingTop: spacing.lg,
+      marginTop: spacing.lg,
+    },
+    ledgerLeft: {
+      flex: 1,
+      marginRight: spacing.lg,
+    },
+    ledgerAmount: {
+      fontFamily: fonts.semibold,
+      fontSize: 15,
+      color: colors.text,
+    },
+    ledgerMeta: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.neutral[500],
+      marginTop: 2,
+    },
+    ledgerReceipt: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.neutral[600],
+      marginTop: 2,
     },
     bigValue: {
       fontFamily: fonts.medium,

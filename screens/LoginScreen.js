@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
@@ -10,12 +11,15 @@ import {
 } from 'react-native';
 import { GraduationCap, Cloud } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
+import { useBranding } from '../branding';
+import { APP_FOOTER } from '../version';
+import { alertSuccess, alertError } from '../alerts';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
-import { school } from '../data/mock';
 
 export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
   const { colors } = useTheme();
+  const { name: schoolName, tagline, logo, isDefaultLogo } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [email, setEmail] = useState('');
@@ -33,9 +37,11 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
     try {
       const user = await schoolApi.signIn(email.trim(), password);
       if (!user) throw new ApiError('Sign in failed.', 0);
+      alertSuccess('Signed in', user.display_name || '');
       onSignedIn(user);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed.');
+      alertError('Sign in failed', err instanceof ApiError ? err : 'Sign in failed.');
     } finally {
       setBusy(false);
     }
@@ -50,12 +56,17 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* The school's own logo where one has been uploaded; the generic mark until then. */}
         <View style={styles.badge}>
-          <GraduationCap size={32} color={colors.accentRamp[300]} weight="regular" />
+          {isDefaultLogo ? (
+            <GraduationCap size={32} color={colors.accentRamp[300]} weight="regular" />
+          ) : (
+            <Image source={logo} style={styles.badgeLogo} resizeMode="contain" />
+          )}
         </View>
 
         <Text style={styles.heading}>Staff sign in</Text>
-        <Text style={styles.subtext}>{school.name}</Text>
+        <Text style={styles.subtext}>{tagline ? `${schoolName} · ${tagline}` : schoolName}</Text>
 
         <View style={styles.form}>
           <Text style={styles.fieldLabel}>Email</Text>
@@ -110,6 +121,7 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
         <Text style={styles.footerText} numberOfLines={1}>
           {apiBase || 'No server configured'}
         </Text>
+        <Text style={styles.poweredBy}>{APP_FOOTER}</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -136,6 +148,11 @@ const createStyles = (colors) =>
       justifyContent: 'center',
       alignSelf: 'center',
       marginBottom: spacing.xl,
+      overflow: 'hidden',
+    },
+    badgeLogo: {
+      width: 48,
+      height: 48,
     },
     heading: {
       ...type(colors).heading(24),
@@ -192,5 +209,11 @@ const createStyles = (colors) =>
       fontSize: 12,
       color: colors.neutral[600],
       marginTop: spacing.xs,
+    },
+    poweredBy: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.neutral[700],
+      marginTop: spacing.sm,
     },
   });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, BackHandler, StyleSheet } from 'react-native';
+import { View, AppState, BackHandler, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -10,16 +10,20 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { ThemeProvider, useTheme } from './theme';
+import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError } from './api';
 import { allowedTabs, hasRoster } from './roles';
+import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
 import { ToastProvider } from './components/Toast';
+import AlertHost from './components/AlertHost';
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import ScannerScreen from './screens/ScannerScreen';
 import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
+import ReportScreen from './screens/ReportScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -33,6 +37,11 @@ const STORAGE = {
 };
 
 const RECENT_LIMIT = 6;
+
+/* There is no push channel, so the inbox is polled while the app is in front of someone.
+   A minute is often enough for a message to feel prompt without loading the school's
+   server with a request per staff phone per few seconds. */
+const INBOX_POLL_MS = 60000;
 
 const EMPTY_INBOX = { messages: [], unread: 0, loaded: false, error: '' };
 const EMPTY_CHAT = {
@@ -48,7 +57,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <Root />
+        <BrandingProvider>
+          <Root />
+          {/* Above every screen, so an action can report itself from wherever it ran. */}
+          <AlertHost />
+        </BrandingProvider>
       </ToastProvider>
     </ThemeProvider>
   );
@@ -56,6 +69,7 @@ export default function App() {
 
 function Root() {
   const { colors, theme } = useTheme();
+  const { refresh: refreshBranding } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [fontsLoaded] = useFonts({
@@ -121,11 +135,12 @@ function Root() {
       setRecent(storedRecent);
       if (storedUser && base) setUser(storedUser);
       setBooted(true);
+      if (base) refreshBranding();
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshBranding]);
 
   const loadSchool = useCallback(async ({ force = false } = {}) => {
     if (loadedRef.current && !force) return;
@@ -273,6 +288,7 @@ function Root() {
 
   const handleSignedIn = useCallback((nextUser) => {
     AsyncStorage.setItem(STORAGE.user, JSON.stringify(nextUser)).catch(() => {});
+    refreshBranding();
     loadedRef.current = false;
     stackRef.current = [];
     setStack([]);
@@ -280,7 +296,7 @@ function Root() {
     setInbox(EMPTY_INBOX);
     setChat(EMPTY_CHAT);
     setUser(nextUser);
-  }, []);
+  }, [refreshBranding]);
 
   const handleSignOut = useCallback(() => {
     AsyncStorage.removeItem(STORAGE.user).catch(() => {});
@@ -303,13 +319,14 @@ function Root() {
     (base) => {
       setApiBase(base);
       loadedRef.current = false;
+      refreshBranding();
       // Leaves the "Connected · N students" result on screen briefly before closing.
       setTimeout(() => {
         setSettingsOpen(false);
         if (user && hasRoster(user)) loadSchool({ force: true }).catch(() => {});
       }, 700);
     },
-    [user, loadSchool],
+    [user, loadSchool, refreshBranding],
   );
 
   const retry = useCallback(() => {
@@ -325,6 +342,42 @@ function Root() {
   useEffect(() => {
     if (user && atHome) refreshInbox();
   }, [user, atHome, refreshInbox]);
+
+  /* Keeps the bell honest from any tab. Paused while the app is in the background —
+     nobody is looking, and a phone in a pocket should not be making requests. */
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let timer = null;
+    const start = () => {
+      if (timer) return;
+      timer = setInterval(() => refreshInbox(), INBOX_POLL_MS);
+    };
+    const stop = () => {
+      if (!timer) return;
+      clearInterval(timer);
+      timer = null;
+    };
+
+    /* 'unknown' is what some devices report before the first change event; only a
+       genuinely backgrounded app should sit idle. */
+    if (AppState.currentState !== 'background') start();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refreshInbox();
+        start();
+      } else {
+        stop();
+      }
+    });
+
+    return () => {
+      stop();
+      sub.remove();
+    };
+  }, [user, refreshInbox]);
+
+  useNewMessageChime(inbox);
 
   if (!fontsLoaded || !booted) {
     return (
@@ -420,7 +473,18 @@ function Root() {
         )}
 
         {route.name === 'detail' && (
-          <StudentCardScreen code={route.code} user={user} onBack={pop} />
+          <StudentCardScreen
+            code={route.code}
+            user={user}
+            onBack={pop}
+            /* The card is carried into the route so the report screen does not fetch the
+               student a second time to learn the parent's email. */
+            onSendReport={(card) => push({ name: 'report', card })}
+          />
+        )}
+
+        {route.name === 'report' && (
+          <ReportScreen card={route.card} user={user} onBack={pop} />
         )}
 
         {route.name === 'gateconfirm' && (

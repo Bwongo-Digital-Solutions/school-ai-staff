@@ -9,7 +9,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import PermissionSlip from '../components/PermissionSlip';
 import StudentHeader from '../components/StudentHeader';
 import Field, { FormError } from '../components/Field';
-import { useToast } from '../components/Toast';
+import { alertSuccess, alertError } from '../alerts';
 
 /* Picking an action opens the scanner, and the scan lands here rather than writing straight
    away — the officer sees who they are about to let through before the movement is
@@ -48,7 +48,6 @@ export default function GateConfirmScreen({
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
 
   const [authorisedBy, setAuthorisedBy] = useState('');
   const [note, setNote] = useState('');
@@ -97,14 +96,15 @@ export default function GateConfirmScreen({
       if (!res || !res.pass || res.pass.decision !== decision) {
         throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
       }
-      toast(decision === 'declined' ? 'Turned back' : `${action.confirm} recorded`);
+      alertSuccess(decision === 'declined' ? 'Turned back' : `${action.confirm} recorded`);
       onDone();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : `Not recorded — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
+      alertError('Not recorded', detail);
       setBusy(false);
     }
   };

@@ -41,9 +41,13 @@
     },
     "android": {
       "package": "com.bwongo.staffapp",
+      "versionCode": 1,
       "backgroundColor": "#161826",
       "permissions": [
         "CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

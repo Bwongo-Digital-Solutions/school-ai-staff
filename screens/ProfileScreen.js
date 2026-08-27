@@ -8,9 +8,10 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Moon, Cloud, ArrowsClockwise, LockSimple, SignOut } from 'phosphor-react-native';
+import { useBranding } from '../branding';
+import { APP_FOOTER } from '../version';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { hasRoster, roleLabel, scanPurpose } from '../roles';
-import { school } from '../data/mock';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
 import Button from '../components/Button';
@@ -25,6 +26,7 @@ export default function ProfileScreen({
   onSignOut,
 }) {
   const { colors, theme, toggleTheme } = useTheme();
+  const { name: schoolName } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -126,7 +128,8 @@ export default function ProfileScreen({
           style={styles.signOut}
         />
 
-        <Text style={styles.footNote}>{school.name} · Staff App</Text>
+        <Text style={styles.footNote}>{schoolName} · Staff App</Text>
+        <Text style={styles.footVersion}>{APP_FOOTER}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -199,5 +202,12 @@ const createStyles = (colors) =>
       color: colors.neutral[600],
       textAlign: 'center',
       marginTop: spacing.xxl,
+    },
+    footVersion: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.neutral[700],
+      textAlign: 'center',
+      marginTop: spacing.xs,
     },
   });

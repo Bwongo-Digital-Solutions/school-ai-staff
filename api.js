@@ -217,8 +217,37 @@ export function parseStudentCode(raw) {
   return text;
 }
 
+/* The PDF routes take the caller's role as a query parameter rather than in a body, and
+   only 'admin' or 'teacher' may fetch one. A bursar signs in as an admin, so this is the
+   same value the rest of the app already holds. */
+export function documentUrl(path, params = {}) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  return `${baseUrl}${path}${query ? `?${query}` : ''}`;
+}
+
+/** Where the parent report for one student lives, with only the sections asked for. */
+export const reportUrl = ({ code, sections, requesterRole, actorName }) =>
+  documentUrl(`/api/students/${encodeURIComponent(code)}/report.pdf`, {
+    sections: Array.isArray(sections) ? sections.join(',') : sections,
+    requesterRole,
+    actorName,
+  });
+
+/** The receipt already issued for one payment. Keyed by the payment, not the receipt. */
+export const receiptUrl = ({ paymentId, requesterRole }) =>
+  documentUrl(`/api/fees/receipts/${encodeURIComponent(paymentId)}.pdf`, { requesterRole });
+
 export const schoolApi = {
   health: () => get('/api/health'),
+
+  /* The school's own name, tagline and logo, set by an admin in the web app under
+     Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
+     so the sign-in screen can brand itself before anyone has signed in. */
+  schoolSettings: () =>
+    post('/api/functions/settings', { action: 'get' }).then((d) => (d && d.settings) || null),
 
   signIn: (email, password) =>
     post('/api/functions/auth', { action: 'signin', email, password })
@@ -295,6 +324,22 @@ export const schoolApi = {
     post('/api/functions/search', {
       action: 'query', query, requesterRole, actorName, actorEmail, limit,
     }, { timeout: 25000 }),
+
+  /* A report leaves the phone through the share sheet, so the server is told afterwards
+     that it went — that is the only way a WhatsApp hand-over reaches the log at all. */
+  sendReportEmail: ({ code, to, sections, requesterRole, actorName, actorEmail }) =>
+    post('/api/functions/student-report', {
+      action: 'send_email', code, to, sections, requesterRole, actorName, actorEmail,
+    }, { timeout: 60000 }),
+
+  recordReportShare: ({ code, channel, target, sections, requesterRole, actorName, actorEmail }) =>
+    post('/api/functions/student-report', {
+      action: 'record_share', code, channel, target, sections, requesterRole, actorName, actorEmail,
+    }),
+
+  lastReportSent: ({ code, requesterRole }) =>
+    post('/api/functions/student-report', { action: 'last_sent', code, requesterRole })
+      .then((d) => (d && d.last_sent) || null),
 
   recordMeal: ({ code, meal, servedBy }) =>
     post('/api/functions/meal-record', { code, meal, servedBy }),
