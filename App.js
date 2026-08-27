@@ -23,6 +23,7 @@ import HomeScreen from './screens/HomeScreen';
 import ScannerScreen from './screens/ScannerScreen';
 import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
+import ReportScreen from './screens/ReportScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -472,7 +473,18 @@ function Root() {
         )}
 
         {route.name === 'detail' && (
-          <StudentCardScreen code={route.code} user={user} onBack={pop} />
+          <StudentCardScreen
+            code={route.code}
+            user={user}
+            onBack={pop}
+            /* The card is carried into the route so the report screen does not fetch the
+               student a second time to learn the parent's email. */
+            onSendReport={(card) => push({ name: 'report', card })}
+          />
+        )}
+
+        {route.name === 'report' && (
+          <ReportScreen card={route.card} user={user} onBack={pop} />
         )}
 
         {route.name === 'gateconfirm' && (
