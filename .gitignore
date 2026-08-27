@@ -4,3 +4,11 @@ dist/
 web-build/
 *.log
 .DS_Store
+
+# Generated native projects (expo prebuild)
+android/
+ios/
+
+# Build output
+*.apk
+*.aab
