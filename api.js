@@ -220,6 +220,12 @@ export function parseStudentCode(raw) {
 export const schoolApi = {
   health: () => get('/api/health'),
 
+  /* The school's own name, tagline and logo, set by an admin in the web app under
+     Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
+     so the sign-in screen can brand itself before anyone has signed in. */
+  schoolSettings: () =>
+    post('/api/functions/settings', { action: 'get' }).then((d) => (d && d.settings) || null),
+
   signIn: (email, password) =>
     post('/api/functions/auth', { action: 'signin', email, password })
       .then((d) => (d ? d.user : null)),

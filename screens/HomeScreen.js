@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import {
-  Bell,
   CalendarCheck,
   ChartLineUp,
   Coins,
@@ -10,7 +9,8 @@ import {
   QrCode,
   UsersThree,
 } from 'phosphor-react-native';
-import { useTheme, spacing, fonts, type } from '../theme';
+import { useTheme, radius, spacing, fonts, type } from '../theme';
+import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
 import { designationOf, hasRoster, roleLabel, scanPurpose } from '../roles';
@@ -24,6 +24,7 @@ import StatTile from '../components/StatTile';
 import StateBlock from '../components/StateBlock';
 import SectionLabel from '../components/SectionLabel';
 import CountsRow from '../components/CountsRow';
+import AnimatedBell from '../components/AnimatedBell';
 import MovementList from '../components/MovementList';
 
 function summarise(students, fees, roster) {
@@ -57,6 +58,7 @@ export default function HomeScreen({
   onStartGateAction,
 }) {
   const { colors, toggleTheme } = useTheme();
+  const { name: schoolName, logo } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const roster = hasRoster(user);
@@ -70,7 +72,12 @@ export default function HomeScreen({
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerRow}>
+          <Image source={logo} style={styles.logo} resizeMode="contain" />
+
           <View style={styles.headerLeft}>
+            <Text style={styles.schoolName} numberOfLines={1}>
+              {schoolName}
+            </Text>
             <Text style={styles.greeting} numberOfLines={1}>
               Hello, {(user && user.display_name) || 'there'}
             </Text>
@@ -81,14 +88,7 @@ export default function HomeScreen({
             <Pressable onPress={toggleTheme} hitSlop={10} style={styles.iconButton}>
               <Moon size={20} color={colors.neutral[400]} weight="regular" />
             </Pressable>
-            <Pressable onPress={onOpenMessages} hitSlop={10} style={styles.iconButton}>
-              <Bell size={20} color={colors.neutral[400]} weight="regular" />
-              {unread > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unread > 9 ? '9+' : String(unread)}</Text>
-                </View>
-              ) : null}
-            </Pressable>
+            <AnimatedBell unread={unread} onPress={onOpenMessages} style={styles.iconButton} />
           </View>
         </View>
 
@@ -271,7 +271,7 @@ const createStyles = (colors) =>
     headerRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       marginBottom: spacing.xxl,
     },
     headerLeft: {
@@ -286,23 +286,18 @@ const createStyles = (colors) =>
       padding: spacing.sm,
       marginLeft: spacing.sm,
     },
-    badge: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      minWidth: 16,
-      height: 16,
-      borderRadius: 8,
-      paddingHorizontal: 4,
-      backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
+    logo: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.sm,
+      marginRight: spacing.lg,
     },
-    badgeText: {
-      fontFamily: fonts.semibold,
-      fontSize: 9.5,
-      lineHeight: 16,
-      color: colors.bg,
+    schoolName: {
+      fontFamily: fonts.medium,
+      fontSize: 12,
+      letterSpacing: 0.3,
+      color: colors.neutral[500],
+      marginBottom: 2,
     },
     greeting: {
       ...type(colors).heading(22),

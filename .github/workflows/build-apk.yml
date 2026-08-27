@@ -44,3 +44,21 @@ jobs:
           name: staff-app-release-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # The app plays a notification chime, and expo-av drags RECORD_AUDIO in with it.
+      # app.json blocks that with tools:node="remove", which only takes effect during
+      # Gradle's manifest merge — so this is the only place the result can be checked.
+      - name: Check permissions in the merged manifest
+        working-directory: android
+        run: |
+          manifest=$(find app/build/intermediates -path '*merged_manifest*release*' -name AndroidManifest.xml | head -1)
+          echo "Merged manifest: $manifest"
+          grep -o 'android:name="android.permission.[A-Z_]*"' "$manifest" | sort -u
+          if grep -q 'android.permission.RECORD_AUDIO' "$manifest"; then
+            echo "::error::RECORD_AUDIO reached the APK - the app never records audio."
+            exit 1
+          fi
+          grep -q 'usesCleartextTraffic="true"' "$manifest" || {
+            echo "::error::Cleartext traffic is off - the app cannot reach an http:// server."
+            exit 1
+          }

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
@@ -10,12 +11,13 @@ import {
 } from 'react-native';
 import { GraduationCap, Cloud } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
+import { useBranding } from '../branding';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
-import { school } from '../data/mock';
 
 export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
   const { colors } = useTheme();
+  const { name: schoolName, tagline, logo, isDefaultLogo } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [email, setEmail] = useState('');
@@ -50,12 +52,17 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* The school's own logo where one has been uploaded; the generic mark until then. */}
         <View style={styles.badge}>
-          <GraduationCap size={32} color={colors.accentRamp[300]} weight="regular" />
+          {isDefaultLogo ? (
+            <GraduationCap size={32} color={colors.accentRamp[300]} weight="regular" />
+          ) : (
+            <Image source={logo} style={styles.badgeLogo} resizeMode="contain" />
+          )}
         </View>
 
         <Text style={styles.heading}>Staff sign in</Text>
-        <Text style={styles.subtext}>{school.name}</Text>
+        <Text style={styles.subtext}>{tagline ? `${schoolName} · ${tagline}` : schoolName}</Text>
 
         <View style={styles.form}>
           <Text style={styles.fieldLabel}>Email</Text>
@@ -136,6 +143,11 @@ const createStyles = (colors) =>
       justifyContent: 'center',
       alignSelf: 'center',
       marginBottom: spacing.xl,
+      overflow: 'hidden',
+    },
+    badgeLogo: {
+      width: 48,
+      height: 48,
     },
     heading: {
       ...type(colors).heading(24),
