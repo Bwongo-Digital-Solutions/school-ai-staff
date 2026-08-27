@@ -42,7 +42,7 @@ import PermissionSlip from '../components/PermissionSlip';
 import MovementList from '../components/MovementList';
 import StudentHeader from '../components/StudentHeader';
 import Field, { FormError } from '../components/Field';
-import { useToast } from '../components/Toast';
+import { alertSuccess, alertWarning, alertError } from '../alerts';
 
 /* The server sends only the sections this profile may see, so rendering walks the section
    list it returns. An unknown section is skipped rather than guessed at. */
@@ -191,7 +191,6 @@ const ATTENDANCE_TONE = {
 function RollCallSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -214,14 +213,15 @@ function RollCallSection({ card, user, reload }) {
       if (!res || !res.record || res.record.status !== status) {
         throw new ApiError('The server did not confirm the mark. Nothing was saved.', 0);
       }
-      toast(`Marked ${status}`);
+      alertSuccess(`Marked ${status}`);
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no roll call endpoint. It is running an older build than this app.'
-          : `Not saved — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not saved — ${detail}`);
+      alertError('Not saved', detail);
       setBusy(false);
     }
   };
@@ -283,7 +283,6 @@ function RollCallSection({ card, user, reload }) {
 function ExamSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -306,10 +305,11 @@ function ExamSection({ card, user, reload }) {
         note: trimmed,
         recordedBy: (user && user.display_name) || '',
       });
-      toast(decision === 'approved' ? 'Admitted to the exam' : 'Turned away');
+      alertSuccess(decision === 'approved' ? 'Admitted to the exam' : 'Turned away');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not recorded', err);
       setBusy(false);
     }
   };
@@ -394,7 +394,6 @@ function ExamSection({ card, user, reload }) {
 function ExamGrantSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -410,10 +409,10 @@ function ExamGrantSection({ card, user, reload }) {
           clearanceId: g.active.id,
           by: (user && user.display_name) || '',
         });
-        toast('Clearance revoked');
+        alertSuccess('Clearance revoked');
         reload();
       } catch (err) {
-        toast(err.message);
+        alertError('Not revoked', err);
         setBusy(false);
       }
     };
@@ -451,10 +450,11 @@ function ExamGrantSection({ card, user, reload }) {
         grantedBy: (user && user.display_name) || '',
         grantedByEmail: (user && user.auth_email) || '',
       });
-      toast('Clearance granted');
+      alertSuccess('Clearance granted');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not granted', err);
       setBusy(false);
     }
   };
@@ -754,7 +754,6 @@ function GatePassSection({ card, user, reload }) {
 function ExitDecision({ card, gate, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [authorisedBy, setAuthorisedBy] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -792,14 +791,15 @@ function ExitDecision({ card, gate, user, reload }) {
       if (!res || !res.pass || res.pass.decision !== decision) {
         throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
       }
-      toast(decision === 'approved' ? 'Exit approved' : 'Exit declined');
+      alertSuccess(decision === 'approved' ? 'Exit approved' : 'Exit declined');
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : `Not recorded — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
+      alertError('Not recorded', detail);
       setBusy(false);
     }
   };
@@ -883,7 +883,6 @@ function ExitDecision({ card, gate, user, reload }) {
 function RecordReturn({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -900,14 +899,15 @@ function RecordReturn({ card, user, reload }) {
       if (!res || !res.pass || res.pass.decision !== 'approved') {
         throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
       }
-      toast('Return recorded');
+      alertSuccess('Return recorded');
       reload();
     } catch (err) {
-      setError(
+      const detail =
         err.status === 404
           ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : `Not recorded — ${err.message}`,
-      );
+          : err.message;
+      setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
+      alertError('Not recorded', detail);
       setBusy(false);
     }
   };
@@ -932,7 +932,6 @@ function RecordReturn({ card, user, reload }) {
 function GatePermissionSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [reason, setReason] = useState('');
   const [destination, setDestination] = useState('');
   const [expectedReturn, setExpectedReturn] = useState('');
@@ -951,10 +950,10 @@ function GatePermissionSection({ card, user, reload }) {
           permissionId: active.id,
           by: (user && user.display_name) || '',
         });
-        toast('Permission cancelled');
+        alertSuccess('Permission cancelled');
         reload();
       } catch (err) {
-        toast(err.message);
+        alertError('Not cancelled', err);
         setBusy(false);
       }
     };
@@ -1009,10 +1008,11 @@ function GatePermissionSection({ card, user, reload }) {
         grantedBy: (user && user.display_name) || '',
         grantedByEmail: (user && user.auth_email) || '',
       });
-      toast('Permission granted');
+      alertSuccess('Permission granted');
       reload();
     } catch (err) {
       setError(err.message);
+      alertError('Not granted', err);
       setBusy(false);
     }
   };
@@ -1069,7 +1069,6 @@ const MEAL_ICONS = { breakfast: Coffee, lunch: BowlFood, supper: Cookie };
 function MealCardSection({ card, user, reload }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
   const [busy, setBusy] = useState('');
 
   const m = card.meal_card;
@@ -1083,10 +1082,11 @@ function MealCardSection({ card, user, reload }) {
         meal,
         servedBy: (user && user.display_name) || '',
       });
-      toast(res.already_served ? 'Already served today' : `${humanise(meal)} recorded`);
+      if (res.already_served) alertWarning('Already served today');
+      else alertSuccess(`${humanise(meal)} recorded`);
       reload();
     } catch (err) {
-      toast(err.message);
+      alertError('Not recorded', err);
       setBusy('');
     }
   };

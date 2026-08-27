@@ -12,6 +12,7 @@ import {
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { api, schoolApi, ApiError } from '../api';
 import Button from './Button';
+import { alertSuccess, alertError } from '../alerts';
 
 export default function SettingsSheet({ visible, onClose, onSaved }) {
   const { colors } = useTheme();
@@ -46,12 +47,15 @@ export default function SettingsSheet({ visible, onClose, onSaved }) {
       const health = await schoolApi.health();
       setStatusTone('ok');
       setStatus(`Connected · ${(health && health.students) || 0} students`);
+      alertSuccess('Server connected', `${(health && health.students) || 0} students`);
       setChecking(false);
       onSaved(saved);
     } catch (err) {
       setChecking(false);
       setStatusTone('error');
-      setStatus(err instanceof ApiError ? err.message : 'Could not reach that address.');
+      const detail = err instanceof ApiError ? err.message : 'Could not reach that address.';
+      setStatus(detail);
+      alertError('Cannot reach that server', detail);
     }
   };
 

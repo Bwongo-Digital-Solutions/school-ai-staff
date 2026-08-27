@@ -17,6 +17,7 @@ import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
 import { ToastProvider } from './components/Toast';
+import AlertHost from './components/AlertHost';
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import ScannerScreen from './screens/ScannerScreen';
@@ -57,6 +58,8 @@ export default function App() {
       <ToastProvider>
         <BrandingProvider>
           <Root />
+          {/* Above every screen, so an action can report itself from wherever it ran. */}
+          <AlertHost />
         </BrandingProvider>
       </ToastProvider>
     </ThemeProvider>

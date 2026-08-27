@@ -19,12 +19,11 @@ import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
 import Select from '../components/Select';
 import Field, { FormError } from '../components/Field';
-import { useToast } from '../components/Toast';
+import { alertSuccess, alertError } from '../alerts';
 
 export default function ComposeScreen({ user, onSent, onBack }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const toast = useToast();
 
   const [directory, setDirectory] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -118,10 +117,11 @@ export default function ComposeScreen({ user, onSent, onBack }) {
       setSubject('');
       setBody('');
       setImportant(false);
-      toast('Message sent');
+      alertSuccess('Message sent');
       onSent();
     } catch (err) {
       setError(err.message);
+      alertError('Not sent', err);
       setBusy(false);
     }
   };

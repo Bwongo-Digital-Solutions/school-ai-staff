@@ -23,8 +23,7 @@
     "phosphor-react-native": "^2.3.1",
     "react": "18.2.0",
     "react-native": "0.74.5",
-    "react-native-svg": "15.2.0",
-    "react-native-sweet-alert": "^4.2.0"
+    "react-native-svg": "15.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

@@ -13,6 +13,7 @@ import { GraduationCap, Cloud } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { APP_FOOTER } from '../version';
+import { alertSuccess, alertError } from '../alerts';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
 
@@ -36,9 +37,11 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
     try {
       const user = await schoolApi.signIn(email.trim(), password);
       if (!user) throw new ApiError('Sign in failed.', 0);
+      alertSuccess('Signed in', user.display_name || '');
       onSignedIn(user);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed.');
+      alertError('Sign in failed', err instanceof ApiError ? err : 'Sign in failed.');
     } finally {
       setBusy(false);
     }
