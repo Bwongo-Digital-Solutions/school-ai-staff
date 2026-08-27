@@ -82,16 +82,15 @@ function scrub(value) {
   return value;
 }
 
-/* What to show after "Cannot reach …". A bare "Network request failed" says nothing a user
-   can act on, so it is translated; anything more specific is passed through, because a
-   handshake or certificate message is the thing worth reading. */
+/* What to show after "Cannot reach …". Anything specific is passed through, but the message
+   from a rejected fetch is nearly always the same generic one, so it points at the screen
+   that can actually answer the question rather than pretending to. */
 function reasonFor(error) {
   const detail = String((error && error.message) || '').trim();
+  /* The generic case is almost every case, and it is not the same as "the address is wrong",
+     which is what this used to imply. Server settings can say more. */
   if (!detail || /network request failed/i.test(detail)) {
-    return 'nothing answered at that address. Check the server is running and reachable from this phone.';
-  }
-  if (/certificat|ssl|tls|handshake|trust anchor|x509/i.test(detail)) {
-    return `the secure connection was refused: ${detail}`;
+    return 'the request did not get through. Open Server settings to see why.';
   }
   return detail;
 }
@@ -111,12 +110,11 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
     if (err && err.name === 'AbortError') {
       throw new ApiError('The server took too long to respond.', 0);
     }
-    /* Say what actually went wrong. The generic sentence sent people to check an address
-       that was correct, while the real cause — most often a TLS handshake Android refuses
-       and a browser papers over — was thrown away here. React Native reports "Network
-       request failed" for an ordinary unreachable host and, on Android, surfaces the
-       underlying exception text for a certificate or handshake failure, which is exactly
-       what tells the two apart. */
+    /* whatwg-fetch, which React Native's fetch is built on, rejects every transport failure
+       with a hardcoded TypeError('Network request failed') — a refused certificate, an
+       unresolvable name and a dead port are indistinguishable by the time they arrive here.
+       So this says what little is known and points at Server settings, which asks the same
+       question through XMLHttpRequest and gets the phone's actual words back. */
     throw new ApiError(`Cannot reach ${baseUrl} — ${reasonFor(err)}`, 0);
   }
   clearTimeout(timer);
