@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet, ScrollView, SafeAreaView } fr
 import {
   CalendarCheck,
   ChartLineUp,
+  ClipboardText,
   Coins,
   ListChecks,
   Moon,
@@ -56,6 +57,7 @@ export default function HomeScreen({
   onOpenMessages,
   onOpenRollCall,
   onStartGateAction,
+  onOpenPendingGate,
 }) {
   const { colors, toggleTheme } = useTheme();
   const { name: schoolName, logo } = useBranding();
@@ -127,6 +129,9 @@ export default function HomeScreen({
             {!roster ? (
               designationOf(user) === 'askari' ? (
                 <>
+                  {/* Who the office has cleared to leave today. Answers the question a scan
+                      cannot: is anybody expected out? */}
+                  <PendingGateCard onOpen={onOpenPendingGate} styles={styles} />
                   <GateActions onStart={onStartGateAction} styles={styles} />
                   {/* The gate's own board: today's traffic, without scanning anyone. */}
                   <GateLog styles={styles} />
@@ -172,6 +177,53 @@ export default function HomeScreen({
 
 /* The gate keeper's home leads with the three jobs they actually do. Choosing one opens
    the scanner; the scan lands on a confirmation rather than writing straight away. */
+/* A count rather than the list itself: the gate keeper is standing up, and the number is
+   what tells him whether to open the list at all. Refreshed whenever Home is entered, which
+   is the same heartbeat the inbox uses. */
+function PendingGateCard({ onOpen, styles }) {
+  const { colors } = useTheme();
+  const [count, setCount] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    schoolApi
+      .pendingGatePasses()
+      .then((rows) => {
+        if (!cancelled) setCount(rows.length);
+      })
+      .catch(() => {
+        /* the gate still works by scanning — a number that will not load must not
+           block the screen */
+        if (!cancelled) setCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <Card style={styles.pendingCard}>
+      <View style={styles.spread}>
+        <Text style={styles.pendingLabel}>Expected out today</Text>
+        <Text style={styles.pendingCount}>{count === null ? '—' : String(count)}</Text>
+      </View>
+      <Text style={styles.pendingHint}>
+        {count === 0
+          ? 'Nobody has been cleared to leave today.'
+          : 'Students the office has cleared to leave. Open to let them out or turn them back.'}
+      </Text>
+      <Button
+        label="Open the gate list"
+        icon={ClipboardText}
+        variant={count ? 'primary' : 'secondary'}
+        onPress={onOpen}
+        style={styles.pendingButton}
+      />
+    </Card>
+  );
+}
+
+
 function GateActions({ onStart, styles }) {
   const [choice, setChoice] = useState('');
   const options = useMemo(
@@ -285,6 +337,33 @@ const createStyles = (colors) =>
     iconButton: {
       padding: spacing.sm,
       marginLeft: spacing.sm,
+    },
+    spread: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    pendingCard: {
+      padding: spacing.xl,
+      marginBottom: spacing.xl,
+    },
+    pendingLabel: {
+      fontFamily: fonts.medium,
+      fontSize: 13,
+      color: colors.neutral[400],
+    },
+    pendingCount: {
+      ...type(colors).heading(24),
+    },
+    pendingHint: {
+      fontFamily: fonts.regular,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: colors.neutral[500],
+      marginTop: spacing.sm,
+    },
+    pendingButton: {
+      marginTop: spacing.xl,
     },
     logo: {
       width: 34,

@@ -262,6 +262,11 @@ export const schoolApi = {
       code, direction, decision, authorisedBy, reason, destination, note, recordedBy,
     }),
 
+  /* Everyone cleared to leave today and not yet seen at the gate. Scoped to the school's own
+     day by the server, so an unused slip from yesterday is gone rather than stale. */
+  pendingGatePasses: () =>
+    post('/api/functions/gate-permission', { action: 'pending' }).then((d) => (d && d.pending) || []),
+
   grantGatePermission: ({ code, reason, destination, expectedReturn, grantedBy, grantedByEmail }) =>
     post('/api/functions/gate-permission', {
       action: 'grant', code, reason, destination, expectedReturn, grantedBy, grantedByEmail,

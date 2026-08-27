@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { ChatCircleDots, PencilSimple, WarningCircle } from 'phosphor-react-native';
+import { ChatCircleDots, PencilSimple, Prohibit, SignOut, WarningCircle } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
-import { schoolApi } from '../api';
+import { schoolApi, ApiError } from '../api';
 import { AUDIENCE_LABELS } from '../roles';
 import { dateTime, humanise } from '../format';
 import Badge from '../components/Badge';
@@ -10,6 +10,7 @@ import Button from '../components/Button';
 import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
 import { useToast } from '../components/Toast';
+import { alertSuccess, alertError } from '../alerts';
 
 /* One bell for two things: staff writing to each other, and the system reporting something
    that happened. The server decides who a message reaches; this only renders the feed. */
@@ -30,6 +31,56 @@ export default function MessagesScreen({
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toast = useToast();
+
+  /* A gate permission alert is worth acting on only while the permission is still open.
+     The pending list is the server's answer to that, so the two are cross-referenced rather
+     than the message being trusted on its own: one that was already used, cancelled or
+     retired at the end of its day shows no buttons instead of buttons that would fail. */
+  const [openPermissions, setOpenPermissions] = useState({});
+  const [deciding, setDeciding] = useState('');
+
+  const loadPending = useCallback(async () => {
+    try {
+      const rows = await schoolApi.pendingGatePasses();
+      const byStudent = {};
+      rows.forEach((row) => {
+        byStudent[row.student_id] = row;
+        byStudent[row.student_number] = row;
+      });
+      setOpenPermissions(byStudent);
+    } catch {
+      /* the list is what makes the buttons appear; without it the message is still readable */
+      setOpenPermissions({});
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPending();
+  }, [loadPending]);
+
+  const decideFromMessage = async (entry, decision) => {
+    setDeciding(entry.id);
+    try {
+      const res = await schoolApi.recordGatePass({
+        code: entry.student_number,
+        direction: 'out',
+        decision,
+        reason: entry.reason,
+        destination: entry.destination,
+        authorisedBy: entry.granted_by,
+        recordedBy: (user && user.display_name) || '',
+      });
+      if (!res || !res.pass || res.pass.decision !== decision) {
+        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
+      }
+      alertSuccess(decision === 'approved' ? 'Let out' : 'Turned back', entry.full_name);
+      await loadPending();
+    } catch (err) {
+      alertError('Not recorded', err);
+    } finally {
+      setDeciding('');
+    }
+  };
   const [busy, setBusy] = useState(false);
 
   const messages = inbox.messages || [];
@@ -133,6 +184,27 @@ export default function MessagesScreen({
                         m,
                       )} · ${dateTime(m.created_at)}`}
                     </Text>
+
+                    {m.event_type === 'gate_permission' && openPermissions[m.student_id] ? (
+                      <View style={styles.gateActions}>
+                        <Button
+                          label={deciding === openPermissions[m.student_id].id ? 'Recording…' : 'Let out'}
+                          icon={SignOut}
+                          variant="primary"
+                          onPress={() => decideFromMessage(openPermissions[m.student_id], 'approved')}
+                          loading={deciding === openPermissions[m.student_id].id}
+                          disabled={!!deciding}
+                        />
+                        <Button
+                          label="Turn back"
+                          icon={Prohibit}
+                          variant="ghost"
+                          onPress={() => decideFromMessage(openPermissions[m.student_id], 'declined')}
+                          disabled={!!deciding}
+                          style={styles.gateSecondary}
+                        />
+                      </View>
+                    ) : null}
                   </View>
                   {m.read ? null : <View style={styles.dot} accessibilityLabel="Unread" />}
                 </Pressable>
@@ -147,6 +219,12 @@ export default function MessagesScreen({
 
 const createStyles = (colors) =>
   StyleSheet.create({
+    gateActions: {
+      marginTop: spacing.lg,
+    },
+    gateSecondary: {
+      marginTop: spacing.sm,
+    },
     safe: {
       flex: 1,
       backgroundColor: colors.bg,

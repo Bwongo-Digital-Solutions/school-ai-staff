@@ -24,6 +24,7 @@ import ScannerScreen from './screens/ScannerScreen';
 import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
+import PendingGateScreen from './screens/PendingGateScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -422,6 +423,7 @@ function Root() {
             loading={pending}
             error={error}
             unread={inbox.unread}
+            onOpenPendingGate={() => push({ name: 'pendinggate' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
             onOpenStudent={openStudent}
@@ -481,6 +483,10 @@ function Root() {
                student a second time to learn the parent's email. */
             onSendReport={(card) => push({ name: 'report', card })}
           />
+        )}
+
+        {route.name === 'pendinggate' && (
+          <PendingGateScreen user={user} onBack={pop} />
         )}
 
         {route.name === 'report' && (
