@@ -12,6 +12,7 @@ import {
 import { GraduationCap, Cloud } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
+import { APP_FOOTER } from '../version';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
 
@@ -117,6 +118,7 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
         <Text style={styles.footerText} numberOfLines={1}>
           {apiBase || 'No server configured'}
         </Text>
+        <Text style={styles.poweredBy}>{APP_FOOTER}</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -204,5 +206,11 @@ const createStyles = (colors) =>
       fontSize: 12,
       color: colors.neutral[600],
       marginTop: spacing.xs,
+    },
+    poweredBy: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.neutral[700],
+      marginTop: spacing.sm,
     },
   });

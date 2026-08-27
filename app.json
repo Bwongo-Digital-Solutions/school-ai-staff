@@ -41,6 +41,7 @@
     },
     "android": {
       "package": "com.bwongo.staffapp",
+      "versionCode": 1,
       "backgroundColor": "#161826",
       "permissions": [
         "CAMERA"

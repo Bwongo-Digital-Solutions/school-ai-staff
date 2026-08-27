@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Moon, Cloud, ArrowsClockwise, LockSimple, SignOut } from 'phosphor-react-native';
 import { useBranding } from '../branding';
+import { APP_FOOTER } from '../version';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { hasRoster, roleLabel, scanPurpose } from '../roles';
 import Card from '../components/Card';
@@ -128,6 +129,7 @@ export default function ProfileScreen({
         />
 
         <Text style={styles.footNote}>{schoolName} · Staff App</Text>
+        <Text style={styles.footVersion}>{APP_FOOTER}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -200,5 +202,12 @@ const createStyles = (colors) =>
       color: colors.neutral[600],
       textAlign: 'center',
       marginTop: spacing.xxl,
+    },
+    footVersion: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.neutral[700],
+      textAlign: 'center',
+      marginTop: spacing.xs,
     },
   });
