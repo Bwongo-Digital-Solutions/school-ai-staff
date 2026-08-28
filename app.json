@@ -44,7 +44,8 @@
       "versionCode": 1,
       "backgroundColor": "#161826",
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "VIBRATE"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  Animated,
+  Easing,
+  Vibration,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { QrCode, Keyboard, CameraSlash } from 'phosphor-react-native';
+import { QrCode, Keyboard, CameraSlash, Flashlight } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { schoolApi, ApiError, parseStudentCode } from '../api';
 import { designationOf } from '../roles';
@@ -18,6 +21,8 @@ import ScreenHeader from '../components/ScreenHeader';
 
 const FRAME_SIZE = 240;
 const BRACKET = 28;
+const INSET = 12;                                  // matches the corner bracket inset
+const SWEEP_TRAVEL = FRAME_SIZE - INSET * 2 - 3;   // bar height is 3
 
 const TITLES = {
   card: 'Scan student',
@@ -52,9 +57,16 @@ export default function ScannerScreen({
   const [busy, setBusy] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
+  const [torch, setTorch] = useState(false);
+  /* Where the found code sits in the frame, when the camera tells us. */
+  const [lockRect, setLockRect] = useState(null);
+  const [flash, setFlash] = useState(false);
+
   /* A single QR stays in frame for many frames, so the first hit latches the scanner
      until the lookup settles. */
   const lockRef = useRef(false);
+
+  const sweep = useRef(new Animated.Value(0)).current;
 
   const lookup = useCallback(
     async (number, scanned) => {
@@ -88,6 +100,7 @@ export default function ScannerScreen({
         );
       } finally {
         setBusy(false);
+        setLockRect(null);
         lockRef.current = false;
       }
     },
@@ -98,6 +111,17 @@ export default function ScannerScreen({
     (result) => {
       if (lockRef.current) return;
       lockRef.current = true;
+
+      /* expo-camera's geometry is not dependable — on Android it is frequently absent
+         or reported in a different space than the preview. Take it only when it lands
+         inside the frame; otherwise flash the whole viewfinder instead. Either way the
+         lookup below is identical, so a device that reports nothing still scans. */
+      const rect = frameRect(result);
+      if (rect) setLockRect(rect);
+      setFlash(true);
+      setTimeout(() => setFlash(false), 320);
+      Vibration.vibrate(40);
+
       lookup(parseStudentCode((result && result.data) || ''), true);
     },
     [lookup],
@@ -107,11 +131,38 @@ export default function ScannerScreen({
     setMode(next);
     setError('');
     setNotice('');
+    setLockRect(null);
     lockRef.current = false;
   };
 
   const granted = permission && permission.granted;
   const hint = HINTS[intent];
+  const hunting = granted && mode === 'qr' && !busy && !lockRect;
+
+  /* The sweep runs only while the camera is actually hunting — it stops once a code is
+     found or a lookup is in flight, so motion always means "still looking". */
+  useEffect(() => {
+    if (!hunting) {
+      sweep.stopAnimation();
+      sweep.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sweep, {
+          toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
+        }),
+        Animated.timing(sweep, {
+          toValue: 0, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [hunting, sweep]);
+
+  // Leaving the screen with the torch lit would strand it on.
+  useEffect(() => () => setTorch(false), []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -152,6 +203,7 @@ export default function ScannerScreen({
                 <CameraView
                   style={StyleSheet.absoluteFill}
                   facing="back"
+                  enableTorch={torch}
                   barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                   onBarcodeScanned={busy ? undefined : handleBarcode}
                 />
@@ -160,10 +212,45 @@ export default function ScannerScreen({
                   <CameraSlash size={72} color={colors.neutral[700]} weight="regular" />
                 </View>
               )}
+              {hunting ? (
+                <Animated.View
+                  style={[
+                    styles.scanLine,
+                    {
+                      transform: [
+                        {
+                          translateY: sweep.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, SWEEP_TRAVEL],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              ) : null}
               <Corner style={styles.cornerTL} styles={styles} />
               <Corner style={styles.cornerTR} styles={styles} />
               <Corner style={styles.cornerBL} styles={styles} />
               <Corner style={styles.cornerBR} styles={styles} />
+              {lockRect ? <View style={[styles.lockBox, lockRect]} /> : null}
+              {flash ? <View style={styles.hitFlash} /> : null}
+              {granted ? (
+                <Pressable
+                  style={[styles.torchBtn, torch && styles.torchBtnOn]}
+                  onPress={() => setTorch((on) => !on)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Toggle the torch"
+                  accessibilityState={{ selected: torch }}
+                  hitSlop={8}
+                >
+                  <Flashlight
+                    size={20}
+                    color={torch ? '#fff' : colors.neutral[800]}
+                    weight={torch ? 'fill' : 'regular'}
+                  />
+                </Pressable>
+              ) : null}
               {busy ? (
                 <View style={styles.busyOverlay}>
                   <ActivityIndicator color={colors.accentRamp[200]} />
@@ -248,6 +335,51 @@ function SegmentButton({ label, icon: Icon, active, onPress, styles, colors }) {
   );
 }
 
+/* Reduce whatever geometry expo-camera gave us to a rect in preview coordinates, or
+   null when it is unusable. Accepts cornerPoints first (more precise) then bounds, and
+   rejects anything that does not sit inside the frame — Android sometimes reports image
+   coordinates, which would otherwise paint a box far outside the viewfinder. */
+function frameRect(result) {
+  if (!result) return null;
+  let left;
+  let top;
+  let width;
+  let height;
+
+  const pts = result.cornerPoints;
+  if (Array.isArray(pts) && pts.length >= 2 && pts.every((pt) => pt && isFinite(pt.x) && isFinite(pt.y))) {
+    const xs = pts.map((pt) => pt.x);
+    const ys = pts.map((pt) => pt.y);
+    left = Math.min(...xs);
+    top = Math.min(...ys);
+    width = Math.max(...xs) - left;
+    height = Math.max(...ys) - top;
+  } else if (result.bounds && result.bounds.origin && result.bounds.size) {
+    const { origin, size } = result.bounds;
+    left = origin.x;
+    top = origin.y;
+    width = size.width;
+    height = size.height;
+  } else {
+    return null;
+  }
+
+  if (![left, top, width, height].every((n) => isFinite(n))) return null;
+  if (width <= 0 || height <= 0) return null;
+  // Must land inside the preview, with a little slack for a code at the very edge.
+  const slack = 24;
+  if (left < -slack || top < -slack) return null;
+  if (left + width > FRAME_SIZE + slack || top + height > FRAME_SIZE + slack) return null;
+
+  const pad = 8;
+  return {
+    left: left - pad,
+    top: top - pad,
+    width: width + pad * 2,
+    height: height + pad * 2,
+  };
+}
+
 function Corner({ style, styles }) {
   return <View style={[styles.cornerBase, style]} />;
 }
@@ -327,6 +459,53 @@ const createStyles = (colors) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.scrim,
+    },
+    scanLine: {
+      position: 'absolute',
+      left: INSET,
+      right: INSET,
+      top: INSET,
+      height: 3,
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+      shadowColor: colors.accent,
+      shadowOpacity: 0.9,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 4,
+    },
+    lockBox: {
+      position: 'absolute',
+      borderWidth: 3,
+      borderRadius: 10,
+      borderColor: colors.status.green,
+      shadowColor: colors.status.green,
+      shadowOpacity: 0.8,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 6,
+    },
+    hitFlash: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(111, 191, 154, 0.28)',
+    },
+    /* Centred between the two top brackets; a corner-pinned control sits on one. */
+    torchBtn: {
+      position: 'absolute',
+      top: 10,
+      left: (FRAME_SIZE - 38) / 2,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.18)',
+    },
+    torchBtnOn: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
     },
     cornerBase: {
       position: 'absolute',
