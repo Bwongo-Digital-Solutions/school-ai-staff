@@ -14,6 +14,7 @@ import { SignOut, Prohibit, MapPin, Clock } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts, type } from '../theme';
 import { schoolApi, ApiError } from '../api';
+import { decideGatePass, gateFailureText } from '../gate';
 import { alertSuccess, alertError } from '../alerts';
 import { formatTime } from '../format';
 import ScreenHeader from '../components/ScreenHeader';
@@ -63,21 +64,15 @@ export default function PendingGateScreen({ user, onBack }) {
     setBusy(entry.id);
     setError('');
     try {
-      const res = await schoolApi.recordGatePass({
+      await decideGatePass({
         code: entry.student_number,
         direction: 'out',
         decision,
-        reason: entry.reason,
-        destination: entry.destination,
+        // The row from the pending list is the slip itself, so it names the permission.
+        permission: entry,
         note: decision === 'declined' ? reason.trim() : '',
-        authorisedBy: entry.granted_by,
         recordedBy: (user && user.display_name) || '',
       });
-      // The server echoes the row it wrote, so a movement that never reached the database
-      // cannot look like one that did.
-      if (!res || !res.pass || res.pass.decision !== decision) {
-        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
-      }
       alertSuccess(
         decision === 'approved' ? 'Let out' : 'Turned back',
         entry.full_name,
@@ -88,10 +83,7 @@ export default function PendingGateScreen({ user, onBack }) {
          not what this screen believes it did. */
       await load({ quiet: true });
     } catch (err) {
-      const detail =
-        err.status === 404
-          ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : err.message;
+      const detail = gateFailureText(err);
       setError(`Not recorded — ${detail}`);
       alertError('Not recorded', detail);
     } finally {

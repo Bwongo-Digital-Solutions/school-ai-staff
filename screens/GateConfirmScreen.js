@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { Check, SealCheck, SignIn, SignOut, WarningCircle, X } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
-import { schoolApi, ApiError } from '../api';
+import { decideGatePass, gateFailureText } from '../gate';
 import { formatDate } from '../format';
 import Button from '../components/Button';
 import ScreenHeader from '../components/ScreenHeader';
@@ -84,25 +84,21 @@ export default function GateConfirmScreen({
 
     setBusy(true);
     try {
-      const res = await schoolApi.recordGatePass({
+      await decideGatePass({
         code: student.student_id,
         direction: action.direction,
         decision,
+        /* The slip carries the reason, the destination and its own id. Sending it means a
+           decision taken here is logged the same as one taken from the gate list. */
+        permission: gate.permission || null,
         note: trimmedNote,
         authorisedBy: trimmedAuth,
         recordedBy: (user && user.display_name) || '',
       });
-      // Only call it done once the server hands back the row it wrote.
-      if (!res || !res.pass || res.pass.decision !== decision) {
-        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
-      }
       alertSuccess(decision === 'declined' ? 'Turned back' : `${action.confirm} recorded`);
       onDone();
     } catch (err) {
-      const detail =
-        err.status === 404
-          ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : err.message;
+      const detail = gateFailureText(err);
       setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
       alertError('Not recorded', detail);
       setBusy(false);

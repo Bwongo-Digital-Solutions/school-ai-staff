@@ -30,6 +30,7 @@ import {
 } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi, ApiError, receiptUrl } from '../api';
+import { decideGatePass, gateFailureText } from '../gate';
 import { designationOf } from '../roles';
 import { dateTime, formatDate, humanise, money } from '../format';
 import Card from '../components/Card';
@@ -868,26 +869,20 @@ function ExitDecision({ card, gate, user, reload }) {
 
     setBusy(true);
     try {
-      const res = await schoolApi.recordGatePass({
+      await decideGatePass({
         code: card.student.student_id,
         direction: 'out',
         decision,
+        permission: p || null,
         note: trimmedNote,
         authorisedBy: trimmedAuth,
         reason: p ? '' : reason.trim(),
         recordedBy: (user && user.display_name) || '',
       });
-      // Only call it done once the server hands back the row it wrote.
-      if (!res || !res.pass || res.pass.decision !== decision) {
-        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
-      }
       alertSuccess(decision === 'approved' ? 'Exit approved' : 'Exit declined');
       reload();
     } catch (err) {
-      const detail =
-        err.status === 404
-          ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : err.message;
+      const detail = gateFailureText(err);
       setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
       alertError('Not recorded', detail);
       setBusy(false);
@@ -980,22 +975,16 @@ function RecordReturn({ card, user, reload }) {
     setError('');
     setBusy(true);
     try {
-      const res = await schoolApi.recordGatePass({
+      await decideGatePass({
         code: card.student.student_id,
         direction: 'in',
         decision: 'approved',
         recordedBy: (user && user.display_name) || '',
       });
-      if (!res || !res.pass || res.pass.decision !== 'approved') {
-        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
-      }
       alertSuccess('Return recorded');
       reload();
     } catch (err) {
-      const detail =
-        err.status === 404
-          ? 'This server has no gate endpoint. It is running an older build than this app.'
-          : err.message;
+      const detail = gateFailureText(err);
       setError(err.status === 404 ? detail : `Not recorded — ${detail}`);
       alertError('Not recorded', detail);
       setBusy(false);

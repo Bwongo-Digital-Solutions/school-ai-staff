@@ -14,7 +14,7 @@ import { useTheme, fonts } from '../theme';
 const RING_EVERY_MS = 4000;
 const SWINGS = 3;
 
-export default function AnimatedBell({ unread = 0, onPress, style }) {
+export default function AnimatedBell({ unread = 0, label = 'Messages', onPress, style }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -73,7 +73,7 @@ export default function AnimatedBell({ unread = 0, onPress, style }) {
       hitSlop={10}
       style={style}
       accessibilityRole="button"
-      accessibilityLabel={unread > 0 ? `Messages, ${unread} unread` : 'Messages'}
+      accessibilityLabel={unread > 0 ? `${label}, ${unread}` : label}
     >
       {/* The badge sits outside the animated view so the count stays upright and legible
           while the bell swings under it. */}

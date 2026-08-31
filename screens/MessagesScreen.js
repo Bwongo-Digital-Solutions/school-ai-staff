@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { ChatCircleDots, PencilSimple, Prohibit, SignOut, WarningCircle } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
-import { schoolApi, ApiError } from '../api';
+import { schoolApi } from '../api';
+import { decideGatePass } from '../gate';
 import { AUDIENCE_LABELS } from '../roles';
 import { dateTime, humanise } from '../format';
 import Badge from '../components/Badge';
@@ -27,6 +28,7 @@ export default function MessagesScreen({
   onReload,
   onCompose,
   onBack,
+  onOpenPendingGate,
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -58,21 +60,19 @@ export default function MessagesScreen({
     loadPending();
   }, [loadPending]);
 
+  /* Only an approval can be taken from here. Turning a student back has to be justified —
+     the server refuses a decline with no reason — and this alert has nowhere to type one,
+     so that button opens the gate list, which does. */
   const decideFromMessage = async (entry, decision) => {
     setDeciding(entry.id);
     try {
-      const res = await schoolApi.recordGatePass({
+      await decideGatePass({
         code: entry.student_number,
         direction: 'out',
         decision,
-        reason: entry.reason,
-        destination: entry.destination,
-        authorisedBy: entry.granted_by,
+        permission: entry,
         recordedBy: (user && user.display_name) || '',
       });
-      if (!res || !res.pass || res.pass.decision !== decision) {
-        throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
-      }
       alertSuccess(decision === 'approved' ? 'Let out' : 'Turned back', entry.full_name);
       await loadPending();
     } catch (err) {
@@ -196,10 +196,10 @@ export default function MessagesScreen({
                           disabled={!!deciding}
                         />
                         <Button
-                          label="Turn back"
+                          label="Turn back…"
                           icon={Prohibit}
                           variant="ghost"
-                          onPress={() => decideFromMessage(openPermissions[m.student_id], 'declined')}
+                          onPress={onOpenPendingGate}
                           disabled={!!deciding}
                           style={styles.gateSecondary}
                         />
