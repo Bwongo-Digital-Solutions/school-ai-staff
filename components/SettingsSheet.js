@@ -13,6 +13,7 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { api, schoolApi, ApiError } from '../api';
 import Button from './Button';
 import { alertSuccess, alertError } from '../alerts';
+import { probeServer, explainProbe, summariseProbe } from '../probe';
 
 export default function SettingsSheet({ visible, onClose, onSaved }) {
   const { colors } = useTheme();
@@ -51,11 +52,18 @@ export default function SettingsSheet({ visible, onClose, onSaved }) {
       setChecking(false);
       onSaved(saved);
     } catch (err) {
+      /* fetch cannot say why it failed — whatwg-fetch flattens every transport error into one
+         sentence — so the same question is asked again through XMLHttpRequest, which keeps
+         the phone's own words. This is the screen where somebody is asking exactly that, and
+         a second request costs nothing next to a connection that is already broken. */
+      const probe = await probeServer(saved);
       setChecking(false);
       setStatusTone('error');
-      const detail = err instanceof ApiError ? err.message : 'Could not reach that address.';
-      setStatus(detail);
-      alertError('Cannot reach that server', detail);
+      const fallback = err instanceof ApiError ? err.message : 'Could not reach that address.';
+      /* The screen gets the phone's exact words, which is what a server administrator needs.
+         The dialog gets one sentence, because it cannot scroll. */
+      setStatus(explainProbe(probe) || fallback);
+      alertError('Cannot reach that server', summariseProbe(probe) || fallback);
     }
   };
 
