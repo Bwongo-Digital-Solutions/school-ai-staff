@@ -12,7 +12,7 @@ import {
 import { ThemeProvider, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError } from './api';
-import { allowedTabs, hasRoster } from './roles';
+import { allowedTabs, hasRoster, isAskari } from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
@@ -45,6 +45,7 @@ const RECENT_LIMIT = 6;
 const INBOX_POLL_MS = 60000;
 
 const EMPTY_INBOX = { messages: [], unread: 0, loaded: false, error: '' };
+const EMPTY_PENDING_GATE = { rows: [], count: 0, loaded: false };
 const EMPTY_CHAT = {
   conversationId: null,
   messages: [],
@@ -98,6 +99,7 @@ function Root() {
   const loadedRef = useRef(false);
 
   const [inbox, setInbox] = useState(EMPTY_INBOX);
+  const [pendingGate, setPendingGate] = useState(EMPTY_PENDING_GATE);
   const [chat, setChat] = useState(EMPTY_CHAT);
 
   /* The gate keeper's chosen action and the card they just scanned. Nothing is written
@@ -190,6 +192,21 @@ function Root() {
     },
     [user],
   );
+
+  /* The gate's own count, kept beside the inbox because the gate keeper's badge answers a
+     different question: how many students are still waiting to be let out. Unread messages
+     cannot stand in for it — reading the alert would clear the badge while the student is
+     still at the gate, and an unrelated staff message would inflate it. */
+  const refreshPendingGate = useCallback(async () => {
+    if (!user || !isAskari(user) || !api.configured()) return;
+    try {
+      const rows = await schoolApi.pendingGatePasses();
+      setPendingGate({ rows, count: rows.length, loaded: true });
+    } catch {
+      /* Left as it was: a failed poll should not blank a count the gate is working from.
+         PendingGateScreen is where the reason gets explained. */
+    }
+  }, [user]);
 
   const goToTab = useCallback(
     (next) => {
@@ -295,6 +312,7 @@ function Root() {
     setStack([]);
     setTab('home');
     setInbox(EMPTY_INBOX);
+    setPendingGate(EMPTY_PENDING_GATE);
     setChat(EMPTY_CHAT);
     setUser(nextUser);
   }, [refreshBranding]);
@@ -308,6 +326,7 @@ function Root() {
     setSchool({ students: [], fees: [] });
     setError('');
     setInbox(EMPTY_INBOX);
+    setPendingGate(EMPTY_PENDING_GATE);
     setChat(EMPTY_CHAT);
     setGateAction(null);
     setGateCard(null);
@@ -344,6 +363,12 @@ function Root() {
     if (user && atHome) refreshInbox();
   }, [user, atHome, refreshInbox]);
 
+  /* Also refreshed on every return to the root, so a decision made on the gate list is
+     reflected the moment the officer comes back from it. */
+  useEffect(() => {
+    if (user && atRoot) refreshPendingGate();
+  }, [user, atRoot, route.name, refreshPendingGate]);
+
   /* Keeps the bell honest from any tab. Paused while the app is in the background —
      nobody is looking, and a phone in a pocket should not be making requests. */
   useEffect(() => {
@@ -352,7 +377,10 @@ function Root() {
     let timer = null;
     const start = () => {
       if (timer) return;
-      timer = setInterval(() => refreshInbox(), INBOX_POLL_MS);
+      timer = setInterval(() => {
+        refreshInbox();
+        refreshPendingGate();
+      }, INBOX_POLL_MS);
     };
     const stop = () => {
       if (!timer) return;
@@ -366,6 +394,7 @@ function Root() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         refreshInbox();
+        refreshPendingGate();
         start();
       } else {
         stop();
@@ -376,7 +405,7 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox]);
+  }, [user, refreshInbox, refreshPendingGate]);
 
   useNewMessageChime(inbox);
 
@@ -423,6 +452,8 @@ function Root() {
             loading={pending}
             error={error}
             unread={inbox.unread}
+            pendingGateCount={pendingGate.count}
+            pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
@@ -523,6 +554,7 @@ function Root() {
             onInboxChange={setInbox}
             onReload={() => refreshInbox({ quiet: false })}
             onCompose={() => push({ name: 'compose' })}
+            onOpenPendingGate={() => push({ name: 'pendinggate' })}
             onBack={pop}
           />
         )}

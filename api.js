@@ -275,13 +275,19 @@ export const schoolApi = {
   studentCard: (code, role, designation) =>
     post('/api/functions/student-card', { code, role, designation }),
 
-  recordGatePass: ({ code, direction, decision, authorisedBy, reason, destination, note, recordedBy }) =>
+  /* permissionId names the exact slip being answered. Without it the server falls back to the
+     newest open one for that student, which is right for a bare scan but wrong when two are
+     open at once — the other would be left active with nothing able to clear it. */
+  recordGatePass: ({
+    code, direction, decision, authorisedBy, reason, destination, note, recordedBy, permissionId,
+  }) =>
     post('/api/functions/gate-pass', {
-      code, direction, decision, authorisedBy, reason, destination, note, recordedBy,
+      code, direction, decision, authorisedBy, reason, destination, note, recordedBy, permissionId,
     }),
 
-  /* Everyone cleared to leave today and not yet seen at the gate. Scoped to the school's own
-     day by the server, so an unused slip from yesterday is gone rather than stale. */
+  /* Every slip still open and still in date: granted, not yet acted on at the gate, and not
+     cancelled by whoever wrote it. Deliberately not scoped to today — a student cleared to
+     leave late in the evening should not vanish from the gate's list at midnight. */
   pendingGatePasses: () =>
     post('/api/functions/gate-permission', { action: 'pending' }).then((d) => (d && d.pending) || []),
 

@@ -14,7 +14,7 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
-import { designationOf, hasRoster, roleLabel, scanPurpose } from '../roles';
+import { hasRoster, isAskari, roleLabel, scanPurpose } from '../roles';
 import { GATE_ACTIONS } from './GateConfirmScreen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
@@ -51,6 +51,8 @@ export default function HomeScreen({
   loading,
   error,
   unread,
+  pendingGateCount = 0,
+  pendingGateLoaded = false,
   onRetry,
   onScanPress,
   onOpenStudent,
@@ -64,6 +66,7 @@ export default function HomeScreen({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const roster = hasRoster(user);
+  const gateKeeper = isAskari(user);
   const totals = useMemo(() => summarise(students, fees, roster), [students, fees, roster]);
   const recentStudents = useMemo(
     () => recent.map((id) => students.find((s) => s.id === id)).filter(Boolean),
@@ -90,7 +93,14 @@ export default function HomeScreen({
             <Pressable onPress={toggleTheme} hitSlop={10} style={styles.iconButton}>
               <Moon size={20} color={colors.neutral[400]} weight="regular" />
             </Pressable>
-            <AnimatedBell unread={unread} onPress={onOpenMessages} style={styles.iconButton} />
+            {/* For the gate keeper the bell counts students waiting to be let out and opens
+                that list; for everyone else it is the message inbox. */}
+            <AnimatedBell
+              unread={gateKeeper ? pendingGateCount : unread}
+              label={gateKeeper ? 'Students waiting at the gate' : undefined}
+              onPress={gateKeeper ? onOpenPendingGate : onOpenMessages}
+              style={styles.iconButton}
+            />
           </View>
         </View>
 
@@ -127,11 +137,16 @@ export default function HomeScreen({
             </View>
 
             {!roster ? (
-              designationOf(user) === 'askari' ? (
+              isAskari(user) ? (
                 <>
                   {/* Who the office has cleared to leave today. Answers the question a scan
                       cannot: is anybody expected out? */}
-                  <PendingGateCard onOpen={onOpenPendingGate} styles={styles} />
+                  <PendingGateCard
+                    count={pendingGateCount}
+                    loaded={pendingGateLoaded}
+                    onOpen={onOpenPendingGate}
+                    styles={styles}
+                  />
                   <GateActions onStart={onStartGateAction} styles={styles} />
                   {/* The gate's own board: today's traffic, without scanning anyone. */}
                   <GateLog styles={styles} />
@@ -178,44 +193,30 @@ export default function HomeScreen({
 /* The gate keeper's home leads with the three jobs they actually do. Choosing one opens
    the scanner; the scan lands on a confirmation rather than writing straight away. */
 /* A count rather than the list itself: the gate keeper is standing up, and the number is
-   what tells him whether to open the list at all. Refreshed whenever Home is entered, which
-   is the same heartbeat the inbox uses. */
-function PendingGateCard({ onOpen, styles }) {
-  const { colors } = useTheme();
-  const [count, setCount] = useState(null);
+   what tells him whether to open the list at all.
 
-  useEffect(() => {
-    let cancelled = false;
-    schoolApi
-      .pendingGatePasses()
-      .then((rows) => {
-        if (!cancelled) setCount(rows.length);
-      })
-      .catch(() => {
-        /* the gate still works by scanning — a number that will not load must not
-           block the screen */
-        if (!cancelled) setCount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+   The count comes from the root, which polls it for the badge. Fetching it again here would
+   let the card and the bell show different numbers for the same thing. A count that has
+   never loaded shows as '—'; the gate still works by scanning regardless. */
+function PendingGateCard({ count, loaded, onOpen, styles }) {
+  const { colors } = useTheme();
+  const shown = loaded ? count : null;
 
   return (
     <Card style={styles.pendingCard}>
       <View style={styles.spread}>
         <Text style={styles.pendingLabel}>Expected out today</Text>
-        <Text style={styles.pendingCount}>{count === null ? '—' : String(count)}</Text>
+        <Text style={styles.pendingCount}>{shown === null ? '—' : String(shown)}</Text>
       </View>
       <Text style={styles.pendingHint}>
-        {count === 0
+        {shown === 0
           ? 'Nobody has been cleared to leave today.'
           : 'Students the office has cleared to leave. Open to let them out or turn them back.'}
       </Text>
       <Button
         label="Open the gate list"
         icon={ClipboardText}
-        variant={count ? 'primary' : 'secondary'}
+        variant={shown ? 'primary' : 'secondary'}
         onPress={onOpen}
         style={styles.pendingButton}
       />

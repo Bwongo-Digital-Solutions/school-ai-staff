@@ -13,6 +13,9 @@ export const isSupport = (user) => !!user && user.role === 'support_staff';
 
 export const designationOf = (user) => (user && user.designation) || null;
 
+/** The gate keeper. Named once here because both the root and Home need to ask. */
+export const isAskari = (user) => designationOf(user) === 'askari';
+
 /** Only an admin or a teacher gets the roster, the school figures and the assistant. */
 export const hasRoster = (user) =>
   !!user && (user.role === 'admin' || user.role === 'teacher');
