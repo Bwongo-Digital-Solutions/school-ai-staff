@@ -319,6 +319,8 @@ function Root() {
 
   const handleSignOut = useCallback(() => {
     AsyncStorage.removeItem(STORAGE.user).catch(() => {});
+    // The session goes with the account; otherwise the next person to sign in inherits it.
+    api.setToken('').catch(() => {});
     loadedRef.current = false;
     stackRef.current = [];
     setStack([]);
