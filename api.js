@@ -512,6 +512,74 @@ export const schoolApi = {
       filters: [{ field: 'student_id', operator: 'eq', value: studentId }],
       orderBy: { field: 'incident_date', ascending: false },
     }),
+
+  /* Clubs. Reading the catalogue is open to any signed-in member of staff — a matron and an askari
+     both have reason to know where a child is this afternoon — and the server gates every write. */
+  clubs: () =>
+    post('/api/functions/clubs', { action: 'list' }).then((d) => (d && d.clubs) || []),
+
+  clubsFor: (studentId) =>
+    post('/api/functions/clubs', { action: 'for_student', studentId })
+      .then((d) => (d && d.clubs) || []),
+
+  joinClub: ({ clubId, studentId }) =>
+    post('/api/functions/clubs', { action: 'join', clubId, studentId }),
+
+  leaveClub: ({ clubId, studentId }) =>
+    post('/api/functions/clubs', { action: 'leave', clubId, studentId }),
+
+  /* School requirements. `catalogue` is the standing list for a level, which is what registration
+     shows before the student exists; `requirementsFor` is a named student's own answers. */
+  requirementCatalogue: (level) =>
+    post('/api/functions/requirements', { action: 'catalogue', level })
+      .then((d) => (d && d.items) || []),
+
+  requirementsFor: (studentId, { term, academicYear } = {}) =>
+    post('/api/functions/requirements', {
+      action: 'for_student', studentId, term, academicYear,
+    }),
+
+  recordRequirement: ({ studentId, requirementId, status, quantityBrought, note, term, academicYear }) =>
+    post('/api/functions/requirements', {
+      action: 'record', studentId, requirementId, status, quantityBrought, note, term, academicYear,
+    }),
+
+  outstandingRequirements: ({ gradeLevel, classSection, term, academicYear } = {}) =>
+    post('/api/functions/requirements', {
+      action: 'outstanding', gradeLevel, classSection, term, academicYear,
+    }),
+
+  /* The matron's screens. Gated on the post rather than the role: her role is support_staff, the
+     same as the cook's, so the server checks her designation from her own account. */
+  matronDashboard: ({ date, check } = {}) =>
+    post('/api/functions/matron', { action: 'dashboard', date, check }),
+
+  dormRoll: ({ date, check, hostel } = {}) =>
+    post('/api/functions/matron', { action: 'dorm_roll', date, check, hostel }),
+
+  markDorm: ({ studentId, status, date, check, note }) =>
+    post('/api/functions/matron', { action: 'mark', studentId, status, date, check, note }),
+
+  sickBay: ({ includeDischarged } = {}) =>
+    post('/api/functions/matron', { action: 'sick_bay', includeDischarged })
+      .then((d) => (d && d.records) || []),
+
+  admitToSickBay: ({ studentId, complaint, temperature, treatment, note }) =>
+    post('/api/functions/matron', {
+      action: 'admit', studentId, complaint, temperature, treatment, note,
+    }),
+
+  dischargeFromSickBay: ({ recordId, outcome, referredTo, parentInformed, treatment, note }) =>
+    post('/api/functions/matron', {
+      action: 'discharge', recordId, outcome, referredTo, parentInformed, treatment, note,
+    }),
+
+  dormRooms: () =>
+    post('/api/functions/matron', { action: 'rooms' }).then((d) => (d && d.rooms) || []),
+
+  matronWelfare: ({ hostel } = {}) =>
+    post('/api/functions/matron', { action: 'welfare', hostel })
+      .then((d) => (d && d.students) || []),
 };
 
 export { ApiError };

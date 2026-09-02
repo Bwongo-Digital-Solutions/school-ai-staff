@@ -26,6 +26,7 @@ import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PendingGateScreen from './screens/PendingGateScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
+import MatronScreen from './screens/MatronScreen';
 import MarksScreen from './screens/MarksScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
@@ -459,6 +460,7 @@ function Root() {
             pendingGateCount={pendingGate.count}
             pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
+            onOpenMatron={() => push({ name: 'matron' })}
             onRegisterStudent={() => push({ name: 'register' })}
             onRecordMarks={() => push({ name: 'marks' })}
             onRetry={retry}
@@ -524,6 +526,10 @@ function Root() {
 
         {route.name === 'pendinggate' && (
           <PendingGateScreen user={user} onBack={pop} />
+        )}
+
+        {route.name === 'matron' && (
+          <MatronScreen user={user} onBack={pop} />
         )}
 
         {route.name === 'report' && (
