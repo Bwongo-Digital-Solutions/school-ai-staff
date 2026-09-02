@@ -5,19 +5,23 @@ import {
   TextInput,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { api, schoolApi, ApiError } from '../api';
 import Button from './Button';
 import { alertSuccess, alertError } from '../alerts';
 import { probeServer, explainProbe, summariseProbe } from '../probe';
+import { useKeyboardHeight } from '../keyboard';
 
 export default function SettingsSheet({ visible, onClose, onSaved }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  /* This sheet is inside a Modal, which on Android is its own window and does not resize
+     when the keyboard opens however the activity is declared. The height is measured and
+     applied here instead, because nothing else is going to do it. */
+  const keyboardHeight = useKeyboardHeight();
 
   const [value, setValue] = useState('');
   const [status, setStatus] = useState('');
@@ -77,11 +81,17 @@ export default function SettingsSheet({ visible, onClose, onSaved }) {
     >
       <View style={styles.backdrop}>
         <Pressable style={styles.dim} onPress={onClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.sheetWrap}
-        >
+        {/* Lifted clear of the keyboard, so the address stays visible while it is typed. */}
+        <View style={[styles.sheetWrap, { paddingBottom: keyboardHeight }]}>
           <View style={styles.sheet}>
+            {/* Scrollable because the sheet can outgrow what is left above a keyboard: a
+                refused certificate reports the phone's own words, which run to a paragraph. */}
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <Text style={styles.title}>Server settings</Text>
             <Text style={styles.caption}>
               The address of your school-ai-search server, including the protocol.
@@ -125,8 +135,9 @@ export default function SettingsSheet({ visible, onClose, onSaved }) {
               disabled={checking}
               style={styles.cancel}
             />
+            </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );
@@ -151,6 +162,14 @@ const createStyles = (colors) =>
       borderTopRightRadius: radius.lg,
       borderTopWidth: 1,
       borderColor: colors.neutral[800],
+      /* Capped so the scroll below has somewhere to scroll to. Without a ceiling the sheet
+         simply grows past the top of the screen and takes the buttons with it. */
+      maxHeight: '85%',
+    },
+    sheetScroll: {
+      flexGrow: 0,
+    },
+    sheetContent: {
       paddingHorizontal: spacing.xxl,
       paddingTop: spacing.xxl,
       paddingBottom: spacing.xxl * 1.5,
