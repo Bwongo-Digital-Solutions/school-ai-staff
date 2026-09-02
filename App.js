@@ -25,6 +25,7 @@ import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PendingGateScreen from './screens/PendingGateScreen';
+import RegisterStudentScreen from './screens/RegisterStudentScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -457,6 +458,7 @@ function Root() {
             pendingGateCount={pendingGate.count}
             pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
+            onRegisterStudent={() => push({ name: 'register' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
             onOpenStudent={openStudent}
@@ -545,6 +547,18 @@ function Root() {
             pinned={rollPinned}
             onSetPinned={setRollPinned}
             onScan={() => push({ name: 'scan', intent: 'rollcall' })}
+            onBack={pop}
+          />
+        )}
+
+        {route.name === 'register' && (
+          <RegisterStudentScreen
+            user={user}
+            onRegistered={() => {
+              // The roster the rest of the app reads is cached; a new student must appear in it.
+              loadedRef.current = false;
+              if (hasRoster(user)) loadSchool({ force: true }).catch(() => {});
+            }}
             onBack={pop}
           />
         )}

@@ -320,6 +320,14 @@ export const schoolApi = {
   studentCard: (code, role, designation) =>
     post('/api/functions/student-card', { code, role, designation }),
 
+  /* Enrolling a student. The number comes from the server both times — asked for up front so the
+     desk can read it out, and issued again at registration in case another phone took it. */
+  nextStudentNumber: () =>
+    post('/api/functions/student-registry', { action: 'next_number' }).then((d) => (d && d.student_id) || ''),
+
+  registerStudent: (student) =>
+    post('/api/functions/student-registry', { action: 'register', ...student }),
+
   /* permissionId names the exact slip being answered. Without it the server falls back to the
      newest open one for that student, which is right for a bare scan but wrong when two are
      open at once — the other would be left active with nothing able to clear it. */

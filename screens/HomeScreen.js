@@ -6,6 +6,7 @@ import {
   ClipboardText,
   Coins,
   ListChecks,
+  UserPlus,
   Moon,
   QrCode,
   UsersThree,
@@ -14,7 +15,7 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
-import { hasRoster, isAskari, roleLabel, scanPurpose } from '../roles';
+import { canRegisterStudents, hasRoster, isAskari, roleLabel, scanPurpose } from '../roles';
 import { GATE_ACTIONS } from './GateConfirmScreen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
@@ -53,6 +54,7 @@ export default function HomeScreen({
   unread,
   pendingGateCount = 0,
   pendingGateLoaded = false,
+  onRegisterStudent,
   onRetry,
   onScanPress,
   onOpenStudent,
@@ -165,6 +167,17 @@ export default function HomeScreen({
                   onPress={onOpenRollCall}
                   style={styles.rollCallButton}
                 />
+
+                {/* Enrolling is the office's job, so only they are offered it. */}
+                {canRegisterStudents(user) ? (
+                  <Button
+                    label="Register a student"
+                    icon={UserPlus}
+                    variant="secondary"
+                    onPress={onRegisterStudent}
+                    style={styles.rollCallButton}
+                  />
+                ) : null}
 
                 <SectionLabel>Recent students</SectionLabel>
                 {recentStudents.length ? (
