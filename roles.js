@@ -13,6 +13,9 @@ export const isSupport = (user) => !!user && user.role === 'support_staff';
 
 export const designationOf = (user) => (user && user.designation) || null;
 
+/** Enrolling a student is an office job, as it is in the portal. */
+export const canRegisterStudents = (user) => !!user && user.role === 'admin';
+
 /** The gate keeper. Named once here because both the root and Home need to ask. */
 export const isAskari = (user) => designationOf(user) === 'askari';
 

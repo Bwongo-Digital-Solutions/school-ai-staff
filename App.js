@@ -25,6 +25,8 @@ import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PendingGateScreen from './screens/PendingGateScreen';
+import RegisterStudentScreen from './screens/RegisterStudentScreen';
+import MarksScreen from './screens/MarksScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -319,6 +321,8 @@ function Root() {
 
   const handleSignOut = useCallback(() => {
     AsyncStorage.removeItem(STORAGE.user).catch(() => {});
+    // The session goes with the account; otherwise the next person to sign in inherits it.
+    api.setToken('').catch(() => {});
     loadedRef.current = false;
     stackRef.current = [];
     setStack([]);
@@ -455,6 +459,8 @@ function Root() {
             pendingGateCount={pendingGate.count}
             pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
+            onRegisterStudent={() => push({ name: 'register' })}
+            onRecordMarks={() => push({ name: 'marks' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
             onOpenStudent={openStudent}
@@ -546,6 +552,20 @@ function Root() {
             onBack={pop}
           />
         )}
+
+        {route.name === 'register' && (
+          <RegisterStudentScreen
+            user={user}
+            onRegistered={() => {
+              // The roster the rest of the app reads is cached; a new student must appear in it.
+              loadedRef.current = false;
+              if (hasRoster(user)) loadSchool({ force: true }).catch(() => {});
+            }}
+            onBack={pop}
+          />
+        )}
+
+        {route.name === 'marks' && <MarksScreen user={user} onBack={pop} />}
 
         {route.name === 'messages' && (
           <MessagesScreen

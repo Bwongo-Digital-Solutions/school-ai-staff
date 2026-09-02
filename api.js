@@ -7,12 +7,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_KEY = 'kps.apiBase';
+const TOKEN_KEY = 'kps.sessionToken';
 const DEFAULT_BASE = '';
 const TIMEOUT = 15000;
 
 /* AsyncStorage is async but call sites need the base synchronously, so the
    stored value is mirrored here and hydrated once at boot. */
 let baseUrl = DEFAULT_BASE;
+
+/* The session token, mirrored for the same reason.
+
+   The server mints a session on sign-in and sets a cookie for browsers, but React Native's fetch
+   keeps no cookie jar, so this app was sending nothing at all and every endpoint behind a role
+   check refused it — a cook could not record a meal even while signed in as one. The server
+   already accounts for exactly this: ask for `issueToken` and send the same token back as a
+   bearer credential. It is one token either way, with the same signature, tenant and expiry. */
+let sessionToken = '';
 
 /* A bare host, or `host:port`, is what people actually type. React Native's
    fetch rejects a URL with no scheme outright, and that surfaces as the same
@@ -36,7 +46,27 @@ export const api = {
     } catch {
       baseUrl = DEFAULT_BASE;
     }
+    try {
+      sessionToken = (await AsyncStorage.getItem(TOKEN_KEY)) || '';
+    } catch {
+      sessionToken = '';
+    }
     return baseUrl;
+  },
+
+  /** Held after signing in, and sent on every later request. */
+  async setToken(token) {
+    sessionToken = String(token || '');
+    try {
+      if (sessionToken) await AsyncStorage.setItem(TOKEN_KEY, sessionToken);
+      else await AsyncStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* storage unavailable — the in-memory token still applies this session */
+    }
+    return sessionToken;
+  },
+  token() {
+    return sessionToken;
   },
   async setBase(url) {
     const clean = normaliseBase(url);
@@ -104,7 +134,14 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
   const timer = setTimeout(() => ctrl.abort(), timeout);
   let res;
   try {
-    res = await fetch(baseUrl + path, { ...init, signal: ctrl.signal });
+    res = await fetch(baseUrl + path, {
+      ...init,
+      headers: {
+        ...(init && init.headers),
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      },
+      signal: ctrl.signal,
+    });
   } catch (err) {
     clearTimeout(timer);
     if (err && err.name === 'AbortError') {
@@ -267,13 +304,50 @@ export const schoolApi = {
   schoolSettings: () =>
     post('/api/functions/settings', { action: 'get' }).then((d) => (d && d.settings) || null),
 
+  /* issueToken asks the server to put the session in the body as well as the cookie, because this
+     client cannot keep a cookie. Without it every role-gated endpoint refuses us. */
   signIn: (email, password) =>
-    post('/api/functions/auth', { action: 'signin', email, password })
-      .then((d) => (d ? d.user : null)),
+    post('/api/functions/auth', { action: 'signin', email, password, issueToken: true })
+      .then(async (d) => {
+        if (d && d.token) await api.setToken(d.token);
+        return d ? d.user : null;
+      }),
+
+  /** Forgets the session, so the next person to use this phone starts as nobody. */
+  signOut: () => api.setToken(''),
 
   /** The scan payload, already trimmed by the server to this profile's sections. */
   studentCard: (code, role, designation) =>
     post('/api/functions/student-card', { code, role, designation }),
+
+  /* Marks. `extract` reads a file and deliberately writes nothing: the teacher checks the
+     proposal and `save` is a separate act. The server matches names to the register, so a model
+     never chooses which child a mark belongs to. */
+  markClasses: () =>
+    post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
+
+  markRoster: ({ gradeLevel, classSection, subjectId, examId }) =>
+    post('/api/functions/marks', {
+      action: 'roster', gradeLevel, classSection, subjectId, examId,
+    }),
+
+  extractMarks: ({ gradeLevel, classSection, subjectId, filename, mimeType, file, modelId }) =>
+    post('/api/functions/marks', {
+      action: 'extract', gradeLevel, classSection, subjectId, filename, mimeType, file, modelId,
+    }, { timeout: 120000 }),
+
+  saveMarks: ({ gradeLevel, classSection, subjectId, examId, marks, source }) =>
+    post('/api/functions/marks', {
+      action: 'save', gradeLevel, classSection, subjectId, examId, marks, source,
+    }, { timeout: 60000 }),
+
+  /* Enrolling a student. The number comes from the server both times — asked for up front so the
+     desk can read it out, and issued again at registration in case another phone took it. */
+  nextStudentNumber: () =>
+    post('/api/functions/student-registry', { action: 'next_number' }).then((d) => (d && d.student_id) || ''),
+
+  registerStudent: (student) =>
+    post('/api/functions/student-registry', { action: 'register', ...student }),
 
   /* permissionId names the exact slip being answered. Without it the server falls back to the
      newest open one for that student, which is right for a bare scan but wrong when two are
