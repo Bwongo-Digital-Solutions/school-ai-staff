@@ -15,15 +15,17 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from 'react-native';
-import { UserPlus } from 'phosphor-react-native';
-import { useTheme, spacing, fonts, type } from '../theme';
+import { Check, UserPlus } from 'phosphor-react-native';
+import { useTheme, spacing, fonts, radius, type } from '../theme';
+import { LEVEL_LABELS, levelForGrade } from '../roles';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
 import Select from '../components/Select';
 import ScreenHeader from '../components/ScreenHeader';
 import Field, { FormError } from '../components/Field';
-import { alertSuccess, alertError } from '../alerts';
+import { alertSuccess, alertError, alertWarning } from '../alerts';
 
 const GRADES = [7, 8, 9, 10, 11, 12, 13];
 const SECTIONS = ['A', 'B', 'C', 'D'];
@@ -55,6 +57,15 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  /* What the school offers, and what this class is asked to bring. Held apart from `form` because
+     neither is a column on the student: both are recorded against them once they exist. */
+  const [clubs, setClubs] = useState(null);
+  const [chosenClubs, setChosenClubs] = useState([]);
+  const [requirements, setRequirements] = useState(null);
+  const [broughtItems, setBroughtItems] = useState([]);
+
+  const level = levelForGrade(form.gradeLevel);
+
   const set = (key) => (value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const loadNumber = useCallback(async () => {
@@ -68,6 +79,48 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
   }, []);
 
   useEffect(() => { loadNumber(); }, [loadNumber]);
+
+  /* The clubs are the same whoever is being enrolled, so they load once. */
+  useEffect(() => {
+    let live = true;
+    schoolApi.clubs()
+      .then((list) => { if (live) setClubs(list); })
+      .catch(() => { if (live) setClubs([]); });
+    return () => { live = false; };
+  }, []);
+
+  /* The requirements list is not: it belongs to the class being chosen, so it is refetched when
+     that changes. Boarding items are left out — there is no bed to attach them to yet, and asking
+     a day student for a mosquito net is how a list stops being believed. */
+  useEffect(() => {
+    if (!level) {
+      setRequirements(null);
+      setBroughtItems([]);
+      return undefined;
+    }
+
+    let live = true;
+    setRequirements(null);
+    schoolApi.requirementCatalogue(level)
+      .then((items) => {
+        if (!live) return;
+        const grade = Number(form.gradeLevel);
+        setRequirements(items.filter((item) => (
+          !item.boarding_only
+          && (item.grade_level === null || Number(item.grade_level) === grade)
+        )));
+      })
+      .catch(() => { if (live) setRequirements([]); });
+    return () => { live = false; };
+  }, [level, form.gradeLevel]);
+
+  /* A tick against an item that is no longer on the list would be sent for a requirement this
+     student was never asked for, so the selection is narrowed whenever the list changes. */
+  useEffect(() => {
+    if (!requirements) return;
+    const offered = new Set(requirements.map((item) => item.id));
+    setBroughtItems((prev) => prev.filter((id) => offered.has(id)));
+  }, [requirements]);
 
   const submit = async () => {
     setError('');
@@ -98,6 +151,11 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
         parentPhone: form.parentPhone.trim(),
         parentEmail: form.parentEmail.trim(),
         address: form.address.trim(),
+        /* Sent with the registration rather than as follow-up calls: this screen posts to the
+           registry endpoint, which writes both in the same request. A club that filled up while
+           the form was open comes back as a note, never as a refused enrolment. */
+        clubs: chosenClubs,
+        requirementsBrought: broughtItems,
       });
 
       // Only done once the server hands back the row it wrote, as everywhere else in this app.
@@ -106,11 +164,22 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
       }
 
       const student = res.student;
-      alertSuccess(
-        'Registered',
-        `${student.first_name} ${student.last_name} is ${student.student_id}`,
-      );
+      const clubProblems = Array.isArray(res.club_errors) ? res.club_errors : [];
+
+      /* The enrolment succeeded either way. A club that could not be joined is said out loud
+         because the parent is standing there and can still be offered another one. */
+      if (clubProblems.length) {
+        alertWarning('Registered, with one thing outstanding', clubProblems.join(' '));
+      } else {
+        alertSuccess(
+          'Registered',
+          `${student.first_name} ${student.last_name} is ${student.student_id}`,
+        );
+      }
+
       setForm(EMPTY);
+      setChosenClubs([]);
+      setBroughtItems([]);
       loadNumber();
       onRegistered?.(student);
     } catch (err) {
@@ -180,6 +249,92 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
             placeholder="YYYY-MM-DD"
             keyboardType="numbers-and-punctuation"
           />
+
+          {/* Clubs. A student joins any number; a full one cannot be chosen at all, which is a
+              kinder way to say no than accepting the tap and refusing on save. */}
+          <Text style={styles.sectionLabel}>Clubs</Text>
+          {clubs === null ? (
+            <Text style={styles.pickerHint}>Loading the clubs…</Text>
+          ) : clubs.length === 0 ? (
+            <Text style={styles.pickerHint}>
+              No clubs have been set up yet. An administrator adds them in the web app.
+            </Text>
+          ) : (
+            <View style={styles.chips}>
+              {clubs.map((club) => {
+                const chosen = chosenClubs.includes(club.id);
+                const blocked = club.full && !chosen;
+                return (
+                  <Pressable
+                    key={club.id}
+                    onPress={() => {
+                      if (blocked || busy) return;
+                      setChosenClubs((prev) =>
+                        chosen ? prev.filter((id) => id !== club.id) : [...prev, club.id]);
+                    }}
+                    style={[
+                      styles.chip,
+                      chosen && styles.chipOn,
+                      blocked && styles.chipOff,
+                    ]}
+                  >
+                    <Text style={[styles.chipText, chosen && styles.chipTextOn]}>
+                      {club.name}
+                      {club.capacity ? ` · ${club.member_count}/${club.capacity}` : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          {/* School requirements, for the class chosen above. The list changes when the class
+              changes, which is the whole point of scoping it by class. */}
+          <Text style={styles.sectionLabel}>
+            {level ? `Requirements · ${LEVEL_LABELS[level]}` : 'Requirements'}
+          </Text>
+          {!form.gradeLevel ? (
+            <Text style={styles.pickerHint}>Choose a class to see what this student should bring.</Text>
+          ) : requirements === null ? (
+            <Text style={styles.pickerHint}>Loading the list…</Text>
+          ) : requirements.length === 0 ? (
+            <Text style={styles.pickerHint}>
+              Nothing is set for this class yet. An administrator publishes the list in the web app.
+            </Text>
+          ) : (
+            <>
+              {requirements.map((item) => {
+                const brought = broughtItems.includes(item.id);
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      if (busy) return;
+                      setBroughtItems((prev) =>
+                        brought ? prev.filter((id) => id !== item.id) : [...prev, item.id]);
+                    }}
+                    style={styles.checkRow}
+                  >
+                    <View style={[styles.checkBox, brought && styles.checkBoxOn]}>
+                      {brought ? <Check size={14} color={colors.bg} weight="bold" /> : null}
+                    </View>
+                    <View style={styles.checkLabel}>
+                      <Text style={styles.checkName}>
+                        {item.item_name}
+                        {item.quantity > 1 || item.unit ? ` — ${item.quantity} ${item.unit}`.trimEnd() : ''}
+                      </Text>
+                      {item.mandatory ? null : <Text style={styles.checkNote}>Optional</Text>}
+                      {item.notes ? <Text style={styles.checkNote}>{item.notes}</Text> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+              <Text style={styles.pickerHint}>
+                Tick what has actually arrived. The rest is recorded as still owed rather than
+                forgotten.
+              </Text>
+            </>
+          )}
 
           <Text style={styles.sectionLabel}>Parent or guardian</Text>
           <Field
@@ -266,4 +421,81 @@ const createStyles = (colors) =>
     },
     error: { marginTop: spacing.xs },
     submit: { marginTop: spacing.sm },
+
+    pickerHint: {
+      fontFamily: fonts.regular,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: colors.neutral[500],
+      marginTop: spacing.xs,
+    },
+
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: spacing.xs,
+    },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.neutral[800],
+      // A pill, which the theme has no token for — the ramp stops at lg (14).
+      borderRadius: 999,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      marginRight: spacing.sm,
+      marginTop: spacing.sm,
+      backgroundColor: colors.surface,
+    },
+    chipOn: {
+      borderColor: colors.accentRamp[300],
+      backgroundColor: colors.accentRamp[800],
+    },
+    // A club with no places left is shown, not hidden: the parent can see it exists and is full.
+    chipOff: {
+      opacity: 0.4,
+    },
+    chipText: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.neutral[400],
+    },
+    chipTextOn: {
+      fontFamily: fonts.medium,
+      color: colors.text,
+    },
+
+    checkRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingVertical: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    checkBox: {
+      width: 22,
+      height: 22,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.neutral[700],
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.lg,
+      marginTop: 1,
+    },
+    checkBoxOn: {
+      backgroundColor: colors.accentRamp[300],
+      borderColor: colors.accentRamp[300],
+    },
+    checkLabel: { flex: 1 },
+    checkName: {
+      fontFamily: fonts.regular,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.text,
+    },
+    checkNote: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.neutral[600],
+      marginTop: 1,
+    },
   });

@@ -64,6 +64,8 @@ const SECTION_RENDERERS = {
   gate_pass: GatePassSection,
   gate_permission: GatePermissionSection,
   meal_card: MealCardSection,
+  clubs: ClubsSection,
+  requirements: RequirementsSection,
 };
 
 export default function StudentCardScreen({ code, user, onBack, onSendReport }) {
@@ -662,6 +664,96 @@ function AttendanceSection({ card }) {
           </View>
         ) : (
           <Text style={styles.metaSpaced}>No roll call recorded yet.</Text>
+        )}
+      </Card>
+    </>
+  );
+}
+
+/* What this student joined. Shown to whoever the server judged has reason to know where a child
+   is this afternoon — which is not the gate keeper or the kitchen. */
+function ClubsSection({ card }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const clubs = card.clubs || [];
+
+  return (
+    <>
+      <SectionLabel>Clubs</SectionLabel>
+      <Card style={styles.sectionCard}>
+        {clubs.length === 0 ? (
+          <Text style={styles.meta}>Not in any club.</Text>
+        ) : (
+          clubs.map((club, index) => (
+            <View key={club.club_id || index} style={index ? styles.stackedRow : null}>
+              <Text style={styles.headline}>{club.name}</Text>
+              <Text style={styles.meta}>
+                {[
+                  club.patron_name ? `Patron ${club.patron_name}` : '',
+                  club.meeting_day
+                    ? `${club.meeting_day}${club.meeting_time ? ` ${club.meeting_time}` : ''}`
+                    : '',
+                  club.venue,
+                ].filter(Boolean).join(' · ') || 'No meeting time set'}
+              </Text>
+            </View>
+          ))
+        )}
+      </Card>
+    </>
+  );
+}
+
+/* What the student was asked to bring, and what actually arrived. The matron reads this at the
+   dormitory door, which is why it leads with what is still owed rather than with the full list. */
+function RequirementsSection({ card }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const data = card.requirements;
+  const items = (data && data.items) || [];
+  const owed = items.filter((item) => item.mandatory && item.status === 'pending');
+
+  return (
+    <>
+      <SectionLabel>School requirements</SectionLabel>
+      <Card style={styles.sectionCard}>
+        {items.length === 0 ? (
+          <Text style={styles.meta}>Nothing is set for this class.</Text>
+        ) : (
+          <>
+            <View style={styles.headlineRow}>
+              <ClipboardText size={26} color={colors.accent} weight="regular" style={styles.headlineIcon} />
+              <View style={styles.headlineBody}>
+                <Text style={styles.headline}>
+                  {owed.length === 0
+                    ? 'Everything brought'
+                    : `${owed.length} still to bring`}
+                </Text>
+                <Text style={styles.meta}>
+                  {`${items.length} on the ${data.level || ''} list`.replace('  ', ' ')}
+                </Text>
+              </View>
+            </View>
+
+            {items.map((item) => (
+              <View key={item.requirement_id} style={styles.stackedRow}>
+                <Text style={styles.headline}>
+                  {item.item_name}
+                  {item.quantity_expected > 1 || item.unit
+                    ? ` — ${item.quantity_expected} ${item.unit}`.trimEnd()
+                    : ''}
+                </Text>
+                <Text style={styles.meta}>
+                  {item.status === 'brought'
+                    ? `Brought${item.recorded_by ? ` · recorded by ${item.recorded_by}` : ''}`
+                    : item.status === 'waived'
+                      ? 'Excused'
+                      : 'Still owed'}
+                  {item.mandatory ? '' : ' · optional'}
+                </Text>
+              </View>
+            ))}
+          </>
         )}
       </Card>
     </>
@@ -1338,6 +1430,13 @@ const createStyles = (colors) =>
       fontFamily: fonts.medium,
       fontSize: 16,
       color: colors.text,
+    },
+    // One entry in a list of them inside a section card: a club, or a requirement.
+    stackedRow: {
+      marginTop: spacing.lg,
+      paddingTop: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.neutral[800],
     },
     markActions: {
       flexDirection: 'row',

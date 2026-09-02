@@ -3,7 +3,9 @@ name: Build Android APK
 on:
   push:
     branches:
-      - claude/build-apk-from-repo-92satr
+      # Any working branch, rather than one named branch. The single name here meant that moving
+      # the work onto a new branch silently stopped producing APKs, with nothing to notice.
+      - claude/**
   workflow_dispatch:
 
 jobs:
