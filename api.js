@@ -320,6 +320,27 @@ export const schoolApi = {
   studentCard: (code, role, designation) =>
     post('/api/functions/student-card', { code, role, designation }),
 
+  /* Marks. `extract` reads a file and deliberately writes nothing: the teacher checks the
+     proposal and `save` is a separate act. The server matches names to the register, so a model
+     never chooses which child a mark belongs to. */
+  markClasses: () =>
+    post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
+
+  markRoster: ({ gradeLevel, classSection, subjectId, examId }) =>
+    post('/api/functions/marks', {
+      action: 'roster', gradeLevel, classSection, subjectId, examId,
+    }),
+
+  extractMarks: ({ gradeLevel, classSection, subjectId, filename, mimeType, file, modelId }) =>
+    post('/api/functions/marks', {
+      action: 'extract', gradeLevel, classSection, subjectId, filename, mimeType, file, modelId,
+    }, { timeout: 120000 }),
+
+  saveMarks: ({ gradeLevel, classSection, subjectId, examId, marks, source }) =>
+    post('/api/functions/marks', {
+      action: 'save', gradeLevel, classSection, subjectId, examId, marks, source,
+    }, { timeout: 60000 }),
+
   /* Enrolling a student. The number comes from the server both times — asked for up front so the
      desk can read it out, and issued again at registration in case another phone took it. */
   nextStudentNumber: () =>

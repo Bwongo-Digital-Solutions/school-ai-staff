@@ -26,6 +26,7 @@ import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PendingGateScreen from './screens/PendingGateScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
+import MarksScreen from './screens/MarksScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GateConfirmScreen from './screens/GateConfirmScreen';
 import RollCallScreen from './screens/RollCallScreen';
@@ -459,6 +460,7 @@ function Root() {
             pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
             onRegisterStudent={() => push({ name: 'register' })}
+            onRecordMarks={() => push({ name: 'marks' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
             onOpenStudent={openStudent}
@@ -562,6 +564,8 @@ function Root() {
             onBack={pop}
           />
         )}
+
+        {route.name === 'marks' && <MarksScreen user={user} onBack={pop} />}
 
         {route.name === 'messages' && (
           <MessagesScreen
