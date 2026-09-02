@@ -50,7 +50,11 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      /* 'height' rather than nothing on Android: an undefined behaviour makes this component
+         a plain View that does not avoid anything. The activity is declared adjustResize, so
+         this is the belt to that window's braces — it keeps the focused field in view rather
+         than leaving it to how far the scroll happens to be. */
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
