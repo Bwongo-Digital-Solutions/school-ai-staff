@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import {
+  Bed,
   CalendarCheck,
   ChartLineUp,
   ClipboardText,
@@ -16,7 +17,7 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
-import { canRegisterStudents, hasRoster, isAskari, roleLabel, scanPurpose } from '../roles';
+import { canRegisterStudents, hasRoster, isAskari, isMatron, roleLabel, scanPurpose } from '../roles';
 import { GATE_ACTIONS } from './GateConfirmScreen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
@@ -64,6 +65,7 @@ export default function HomeScreen({
   onOpenRollCall,
   onStartGateAction,
   onOpenPendingGate,
+  onOpenMatron,
 }) {
   const { colors, toggleTheme } = useTheme();
   const { name: schoolName, logo } = useBranding();
@@ -141,7 +143,20 @@ export default function HomeScreen({
             </View>
 
             {!roster ? (
-              isAskari(user) ? (
+              isMatron(user) ? (
+                <>
+                  {/* The matron's evening, rather than the fee status every other support post
+                      lands on. She has a roll to call and a sick bay to keep. */}
+                  <Button
+                    label="Dormitories"
+                    icon={Bed}
+                    variant="secondary"
+                    onPress={onOpenMatron}
+                    style={styles.rollCallButton}
+                  />
+                  <StateBlock message={scanPurpose(user)} style={styles.supportHint} />
+                </>
+              ) : isAskari(user) ? (
                 <>
                   {/* Who the office has cleared to leave today. Answers the question a scan
                       cannot: is anybody expected out? */}
