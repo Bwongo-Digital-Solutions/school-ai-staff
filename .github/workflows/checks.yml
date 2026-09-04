@@ -1,0 +1,59 @@
+# What a change has to survive before it lands.
+#
+# build-apk.yml builds a real APK, but only for branches named claude/** and only on
+# push — so a branch named anything else is verified by nothing, and main itself is
+# never built at all. This runs on every pull request whatever the branch is called,
+# and on main after a merge, in about two minutes rather than nine.
+#
+# It deliberately stops short of Gradle. Producing an APK stays a deliberate act.
+
+name: Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# A second push should replace the run in flight, not queue behind it.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Install and bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20 with the npm cache, matching build-apk.yml — the two must agree on
+      # how this project is built, or a check passing here proves nothing there.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm ci refuses a lockfile that has drifted from package.json. That is the whole
+      # point of this step: a dependency added without regenerating the lockfile broke
+      # the APK build once already, and nothing was watching for it.
+      - name: Install dependencies
+        run: npm ci
+
+      # Turns app.json into a native project. Catches a malformed android block or a
+      # config plugin that cannot resolve — neither of which the bundle below would see.
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: '1'
+
+      # Metro bundles every screen against the real node_modules, so a broken import,
+      # a missing dependency or a syntax error anywhere in the app fails here. This is
+      # the check with the widest reach and it costs under a minute.
+      - name: Bundle the app
+        run: npx expo export --platform android --output-dir /tmp/expo-export-check
+        env:
+          CI: '1'
