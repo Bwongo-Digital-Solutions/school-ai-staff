@@ -13,7 +13,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, SafeAreaView, StyleSheet, RefreshControl } from 'react-native';
-import { Bed, FirstAid, Heartbeat, Moon, SignOut, Warning } from 'phosphor-react-native';
+import {
+  Bed, FirstAid, Heartbeat, Moon, PencilSimple, Plus, SignOut, Trash, Warning,
+} from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts, radius, type } from '../theme';
 import { schoolApi, ApiError } from '../api';
@@ -29,6 +31,7 @@ import StateBlock from '../components/StateBlock';
 const TABS = [
   { key: 'roll', label: 'Roll call' },
   { key: 'sickbay', label: 'Sick bay' },
+  { key: 'beds', label: 'Beds' },
   { key: 'welfare', label: 'Welfare' },
 ];
 
@@ -64,21 +67,32 @@ export default function MatronScreen({ user, onBack }) {
   const [complaint, setComplaint] = useState('');
   const [temperature, setTemperature] = useState('');
 
+  /* The beds tab. `rooms` is the list; the rest is whichever one form is open — giving a bed in a
+     room, or editing a room — because a phone shows one at a time and two open at once is a screen
+     the matron has to scroll to understand. */
+  const [rooms, setRooms] = useState(null);
+  const [bedFor, setBedFor] = useState('');
+  const [bedStudent, setBedStudent] = useState('');
+  const [bedNumber, setBedNumber] = useState('');
+  const [roomForm, setRoomForm] = useState(null);
+
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setError('');
     try {
-      const [dash, rollData, sickData, welfareData] = await Promise.all([
+      const [dash, rollData, sickData, roomData, welfareData] = await Promise.all([
         schoolApi.matronDashboard(),
         schoolApi.dormRoll(),
         schoolApi.sickBay(),
+        schoolApi.dormRooms(),
         schoolApi.matronWelfare(),
       ]);
       setSummary(dash);
       setRoll((rollData && rollData.students) || []);
       setSick(sickData);
+      setRooms(roomData);
       setWelfare(welfareData);
     } catch (err) {
-      setRoll([]); setSick([]); setWelfare([]);
+      setRoll([]); setSick([]); setRooms([]); setWelfare([]);
       setError(err instanceof ApiError ? err.message : 'Could not load the dormitories.');
     }
   }, []);
@@ -153,6 +167,94 @@ export default function MatronScreen({ user, onBack }) {
       setBusy('');
     }
   };
+
+  /* One shape for every write on the beds tab: mark busy, call, refetch, report. The reload is the
+     server's answer rather than a local patch — the same reason the roll call refetches. */
+  const run = async (key, work, done) => {
+    setBusy(key);
+    setError('');
+    try {
+      await work();
+      if (done) alertSuccess(done.title, done.detail);
+      await load({ quiet: true });
+      return true;
+    } catch (err) {
+      const detail = err instanceof ApiError ? err.message : 'Not recorded.';
+      setError(detail);
+      alertError('Not recorded', detail);
+      return false;
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const giveBed = async (room) => {
+    const student = bedStudent.trim();
+    if (!student) {
+      setError('Which student? Type the number on their card.');
+      return;
+    }
+    let already = false;
+    const ok = await run(`give-${room.id}`, async () => {
+      const result = await schoolApi.assignBed({
+        studentId: student,
+        roomId: room.id,
+        bedNumber: bedNumber.trim() || undefined,
+      });
+      // Already in this room: say so rather than claiming a move that did not happen.
+      already = !!(result && result.already);
+    });
+    if (!ok) return;
+
+    alertSuccess(
+      already ? 'Already in that room' : 'Bed given',
+      `${room.hostel_name} ${room.room_number}`,
+    );
+    setBedFor(''); setBedStudent(''); setBedNumber('');
+  };
+
+  /* Takes the student, not the bed: the server ends whichever assignment is live, and the room list
+     is the only place her name appears at all. */
+  const moveOut = (room, occupant) =>
+    run(
+      `out-${occupant.assignment_id}`,
+      () => schoolApi.releaseBed({ studentId: occupant.student_number }),
+      {
+        title: 'Moved out',
+        detail: `${occupant.first_name} ${occupant.last_name} · ${room.hostel_name} ${room.room_number}`,
+      },
+    );
+
+  const saveRoom = async () => {
+    if (!roomForm) return;
+    const hostelName = roomForm.hostelName.trim();
+    const roomNumber = roomForm.roomNumber.trim();
+    if (!hostelName) { setError('Which hostel?'); return; }
+    if (!roomNumber) { setError('Which room?'); return; }
+
+    /* Emptiness before conversion: Number('') is 0, so a blank field would ask for a room with no
+       beds rather than saying nothing was typed. */
+    if (!roomForm.capacity.trim()) { setError('How many beds?'); return; }
+    const capacity = Number(roomForm.capacity);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      setError('How many beds? A whole number, at least one.');
+      return;
+    }
+
+    const ok = await run(
+      'save-room',
+      () => schoolApi.saveDormRoom({ roomId: roomForm.roomId, hostelName, roomNumber, capacity }),
+      { title: roomForm.roomId ? 'Room saved' : 'Room added', detail: `${hostelName} ${roomNumber}` },
+    );
+    if (ok) setRoomForm(null);
+  };
+
+  const removeRoom = (room) =>
+    run(
+      `remove-${room.id}`,
+      () => schoolApi.removeDormRoom({ roomId: room.id }),
+      { title: 'Room removed', detail: `${room.hostel_name} ${room.room_number}` },
+    );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -328,6 +430,202 @@ export default function MatronScreen({ user, onBack }) {
           )
         )}
 
+        {tab === 'beds' && (
+          <>
+            {/* Adding a room is the matron's own job: she is the person standing in it who knows it
+                holds six beds and not four. */}
+            {roomForm === null ? (
+              <Button
+                label="Add a room"
+                icon={Plus}
+                variant="ghost"
+                onPress={() => {
+                  setRoomForm({ roomId: '', hostelName: '', roomNumber: '', capacity: '' });
+                  setBedFor(''); setError('');
+                }}
+                disabled={!!busy}
+                style={styles.action}
+              />
+            ) : (
+              <Card style={styles.card}>
+                <Text style={styles.name}>{roomForm.roomId ? 'Edit the room' : 'Add a room'}</Text>
+                <Field
+                  label="Hostel"
+                  value={roomForm.hostelName}
+                  onChangeText={(value) => setRoomForm({ ...roomForm, hostelName: value })}
+                  placeholder="Nile House"
+                  editable={!busy}
+                  style={styles.field}
+                />
+                <Field
+                  label="Room number"
+                  value={roomForm.roomNumber}
+                  onChangeText={(value) => setRoomForm({ ...roomForm, roomNumber: value })}
+                  placeholder="12"
+                  editable={!busy}
+                  style={styles.field}
+                />
+                <Field
+                  label="Beds"
+                  value={roomForm.capacity}
+                  onChangeText={(value) => setRoomForm({ ...roomForm, capacity: value })}
+                  placeholder="6"
+                  keyboardType="number-pad"
+                  editable={!busy}
+                />
+                {roomForm.roomId ? (
+                  <Text style={styles.hint}>
+                    The bed count cannot go below the children already sleeping here.
+                  </Text>
+                ) : null}
+                <Button
+                  label={busy === 'save-room' ? 'Saving…' : (roomForm.roomId ? 'Save the room' : 'Add the room')}
+                  variant="primary"
+                  onPress={saveRoom}
+                  loading={busy === 'save-room'}
+                  disabled={!!busy}
+                  style={styles.action}
+                />
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  onPress={() => { setRoomForm(null); setError(''); }}
+                  disabled={!!busy}
+                />
+              </Card>
+            )}
+
+            {rooms === null ? (
+              <StateBlock kind="loading" message="Loading the dormitories…" />
+            ) : rooms.length === 0 ? (
+              <StateBlock message="No rooms yet. Add the first one above." />
+            ) : (
+              rooms.map((room) => (
+                <Card key={room.id} style={styles.card}>
+                  <View style={styles.rowTop}>
+                    <View style={styles.rowMain}>
+                      <Text style={styles.name}>{`${room.hostel_name} ${room.room_number}`}</Text>
+                      <Text style={styles.meta}>
+                        {`${room.occupied} of ${room.capacity} bed${room.capacity === 1 ? '' : 's'} taken`}
+                      </Text>
+                    </View>
+                    {room.full ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>Full</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* The children in the room, by name. A count tells her the room is full; only a
+                      name tells her which child to move, which is the thing she is standing there
+                      to do. */}
+                  {room.occupants.map((occupant) => (
+                    <View key={occupant.assignment_id} style={styles.occupant}>
+                      <View style={styles.rowMain}>
+                        <Text style={styles.occupantName}>
+                          {`${occupant.first_name} ${occupant.last_name}`}
+                        </Text>
+                        <Text style={styles.meta}>
+                          {occupant.student_number}
+                          {occupant.bed_number ? ` · bed ${occupant.bed_number}` : ''}
+                        </Text>
+                      </View>
+                      <Button
+                        label="Move out"
+                        variant="ghost"
+                        onPress={() => moveOut(room, occupant)}
+                        loading={busy === `out-${occupant.assignment_id}`}
+                        disabled={!!busy}
+                      />
+                    </View>
+                  ))}
+
+                  {bedFor === room.id ? (
+                    <>
+                      <Field
+                        label="Student number"
+                        value={bedStudent}
+                        onChangeText={setBedStudent}
+                        placeholder="The number on their card"
+                        autoCapitalize="characters"
+                        editable={!busy}
+                        style={styles.field}
+                      />
+                      <Field
+                        label="Bed number"
+                        value={bedNumber}
+                        onChangeText={setBedNumber}
+                        placeholder="3"
+                        keyboardType="number-pad"
+                        editable={!busy}
+                      />
+                      <Text style={styles.hint}>
+                        A student who already has a bed elsewhere is moved, not duplicated.
+                      </Text>
+                      <Button
+                        label={busy === `give-${room.id}` ? 'Giving…' : 'Give the bed'}
+                        icon={Bed}
+                        variant="primary"
+                        onPress={() => giveBed(room)}
+                        loading={busy === `give-${room.id}`}
+                        disabled={!!busy}
+                        style={styles.action}
+                      />
+                      <Button
+                        label="Cancel"
+                        variant="ghost"
+                        onPress={() => { setBedFor(''); setBedStudent(''); setBedNumber(''); setError(''); }}
+                        disabled={!!busy}
+                      />
+                    </>
+                  ) : (
+                    <View style={styles.roomActions}>
+                      <Button
+                        label="Give a bed"
+                        icon={Bed}
+                        variant="ghost"
+                        onPress={() => {
+                          setBedFor(room.id); setBedStudent(''); setBedNumber('');
+                          setRoomForm(null); setError('');
+                        }}
+                        disabled={!!busy || room.full}
+                        style={styles.roomAction}
+                      />
+                      <Button
+                        label="Edit"
+                        icon={PencilSimple}
+                        variant="ghost"
+                        onPress={() => {
+                          setRoomForm({
+                            roomId: room.id,
+                            hostelName: room.hostel_name,
+                            roomNumber: room.room_number,
+                            capacity: String(room.capacity),
+                          });
+                          setBedFor(''); setError('');
+                        }}
+                        disabled={!!busy}
+                        style={styles.roomAction}
+                      />
+                      {/* Removing an occupied room would cascade the assignments away with it, so
+                          the button is not offered while anyone still sleeps there. */}
+                      <Button
+                        label="Remove"
+                        icon={Trash}
+                        variant="ghost"
+                        onPress={() => removeRoom(room)}
+                        loading={busy === `remove-${room.id}`}
+                        disabled={!!busy || room.occupied > 0}
+                        style={styles.roomAction}
+                      />
+                    </View>
+                  )}
+                </Card>
+              ))
+            )}
+          </>
+        )}
+
         {tab === 'welfare' && (
           welfare === null ? (
             <StateBlock kind="loading" message="Loading…" />
@@ -444,6 +742,34 @@ const createStyles = (colors) =>
     field: { marginTop: spacing.xl },
     action: {
       marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+    },
+
+    /* One child in one bed. Ruled off from the room above it so a long room reads as a list rather
+       than as a paragraph of names. */
+    occupant: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.lg,
+      paddingTop: spacing.lg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.neutral[200],
+    },
+    occupantName: {
+      fontFamily: fonts.medium,
+      fontSize: 15,
+      color: colors.text,
+    },
+    roomActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: spacing.lg,
+      marginHorizontal: -spacing.xs,
+    },
+    roomAction: {
+      flexGrow: 1,
+      flexBasis: '30%',
+      marginHorizontal: spacing.xs,
       marginBottom: spacing.sm,
     },
   });

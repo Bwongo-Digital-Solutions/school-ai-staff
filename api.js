@@ -574,8 +574,22 @@ export const schoolApi = {
       action: 'discharge', recordId, outcome, referredTo, parentInformed, treatment, note,
     }),
 
+  /* Each room carries its occupants, so the phone can show who is in a bed without a request per
+     room — this screen is opened in a dormitory corridor on whatever signal the school has. */
   dormRooms: () =>
     post('/api/functions/matron', { action: 'rooms' }).then((d) => (d && d.rooms) || []),
+
+  assignBed: ({ studentId, roomId, bedNumber }) =>
+    post('/api/functions/matron', { action: 'assign_bed', studentId, roomId, bedNumber }),
+
+  releaseBed: ({ studentId }) =>
+    post('/api/functions/matron', { action: 'release_bed', studentId }),
+
+  saveDormRoom: ({ roomId, hostelName, roomNumber, capacity }) =>
+    post('/api/functions/matron', { action: 'save_room', roomId, hostelName, roomNumber, capacity }),
+
+  removeDormRoom: ({ roomId }) =>
+    post('/api/functions/matron', { action: 'remove_room', roomId }),
 
   matronWelfare: ({ hostel } = {}) =>
     post('/api/functions/matron', { action: 'welfare', hostel })
