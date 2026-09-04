@@ -227,7 +227,7 @@ export default function MarksScreen({ user, onBack }) {
           {classes === null ? (
             <StateBlock kind="loading" message="Loading your classes…" />
           ) : classes.length === 0 ? (
-            <StateBlock message="You have no classes assigned yet. An administrator assigns a class and subject before marks can be entered." />
+            <StateBlock message="You have no classes assigned yet. An administrator gives you one on the web app under Users — open your name and choose Classes — and it appears here." />
           ) : (
             <>
               <Select
