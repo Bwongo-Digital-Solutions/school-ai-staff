@@ -6,6 +6,9 @@ on:
       # Any working branch, rather than one named branch. The single name here meant that moving
       # the work onto a new branch silently stopped producing APKs, with nothing to notice.
       - claude/**
+    tags:
+      # A tag is how a build becomes a release. See the `release` job at the bottom.
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -64,3 +67,41 @@ jobs:
             echo "::error::Cleartext traffic is off - the app cannot reach an http:// server."
             exit 1
           }
+
+  # A build that anyone can install, rather than an artifact that expires and needs a login.
+  #
+  # This is what the alternative app stores need. An Actions artifact is neither a stable address
+  # nor a public one — Obtainium cannot fetch it, and Komi Store installs from *releases* on GitHub,
+  # Codeberg, Forgejo or Gitea and has no direct-file source at all. A release is the one shape both
+  # can read.
+  #
+  # Tags only, so an ordinary push still just builds. And note the honest limit: while this
+  # repository is private, a release is still only reachable with a token — which a QR code must
+  # never carry. This job is what makes the app installable the day the repository is made public;
+  # it does not make that decision.
+  release:
+    name: Attach the APK to the release
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: staff-app-release-apk
+          path: apk
+
+      # Named for the tag rather than left as app-release.apk, so a phone that has downloaded two
+      # of them can tell which is which.
+      - name: Name the file after the version
+        run: |
+          mkdir -p out
+          cp "$(find apk -name '*.apk' | head -1)" "out/school-ai-staff-${GITHUB_REF_NAME}.apk"
+          ls -l out
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
