@@ -193,23 +193,90 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          # base64 -d rejects the whitespace some tools wrap at 76 columns, and `base64` on macOS
+          # wraps by default — so strip it rather than fail on a secret that is actually correct.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > android/app/release.keystore 2>/dev/null || {
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64. Re-run 'base64 -w0 your.keystore' (or 'base64 -i' on macOS) and paste the whole output."
+            exit 1
+          }
           echo "Keystore decoded: $(wc -c < android/app/release.keystore) bytes"
 
+          # keytool reuses the store password for the key when you press enter at the prompt, so an
+          # unset ANDROID_KEY_PASSWORD is the common case rather than a mistake. Gradle, given an
+          # empty one, fails deep inside the build with nothing that points here.
+          KEY_PASSWORD="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+          KEY_ALIAS="${KEY_ALIAS:-school-ai-staff}"
+
+          if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD is empty. Set it to the password you gave keytool."
+            exit 1
+          fi
+
+          # Open the keystore before building. Gradle's failure for a wrong password or a missing
+          # alias is a wall of Java; this says which of the four secrets is wrong, which is the only
+          # thing anybody can act on.
+          # Combined output, not just stderr: keytool prints "keytool error: ..." on **stdout**, so
+          # capturing 2> alone gets an empty file and every branch below falls through to the
+          # unhelpful one. Verified against a real keystore rather than assumed.
+          if ! keytool -list -keystore android/app/release.keystore -alias "$KEY_ALIAS" \
+                 -storepass "$KEYSTORE_PASSWORD" > keytool.err 2>&1; then
+            if grep -qi 'password was incorrect\|Keystore was tampered' keytool.err; then
+              echo "::error::The keystore did not open with ANDROID_KEYSTORE_PASSWORD. Check that secret against the password you gave keytool."
+            elif grep -qi 'does not exist\|Alias .* does not exist' keytool.err; then
+              echo "::error::The keystore opened, but it holds no key called '$KEY_ALIAS'. Set ANDROID_KEY_ALIAS to the -alias you used with keytool; run 'keytool -list -keystore your.keystore' to see it."
+            else
+              echo "::error::The keystore could not be read. $(grep -v 'Picked up JAVA_TOOL_OPTIONS' keytool.err | head -3 | tr '\n' ' ')"
+            fi
+            exit 1
+          fi
+          echo "Keystore opens, and holds the key '$KEY_ALIAS'."
+
+          # The leading blank line is load-bearing. Expo's generated gradle.properties ends without
+          # a trailing newline — the last line is `android.extraMavenRepos=[]` — so appending
+          # directly produced `android.extraMavenRepos=[]ESCHOOL_UPLOAD_STORE_FILE=release.keystore`:
+          # one corrupted property, and ESCHOOL_UPLOAD_STORE_FILE never defined at all. Gradle then
+          # failed on `file(ESCHOOL_UPLOAD_STORE_FILE)` with an unknown property, which is what broke
+          # the first signed release.
           {
+            echo ""
             echo "ESCHOOL_UPLOAD_STORE_FILE=release.keystore"
             echo "ESCHOOL_UPLOAD_STORE_PASSWORD=${KEYSTORE_PASSWORD}"
             echo "ESCHOOL_UPLOAD_KEY_ALIAS=${KEY_ALIAS}"
             echo "ESCHOOL_UPLOAD_KEY_PASSWORD=${KEY_PASSWORD}"
           } >> android/gradle.properties
 
+          # Read them back. A properties file that silently lost a line is exactly the failure this
+          # step just caused, and it is invisible until Gradle is most of the way through a build.
+          for prop in ESCHOOL_UPLOAD_STORE_FILE ESCHOOL_UPLOAD_STORE_PASSWORD ESCHOOL_UPLOAD_KEY_ALIAS ESCHOOL_UPLOAD_KEY_PASSWORD; do
+            grep -q "^${prop}=." android/gradle.properties || {
+              echo "::error::${prop} did not make it into android/gradle.properties, so the build would fail on an unknown property."
+              exit 1
+            }
+          done
+          echo "All four signing properties are set."
+
           node scripts/use-release-signing.mjs
 
       - name: Assemble release APK
         working-directory: android
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee gradle.log
+
+      # A run's log is a download behind a short-lived authenticated URL, so "the build failed" is
+      # where the reading stops for anyone who cannot fetch it. This puts what Gradle actually said
+      # on the pull request.
+      - name: Say what Gradle said
+        if: failure()
+        working-directory: android
+        run: |
+          said=$(grep -A 12 -m 1 -E '^(FAILURE:|\* What went wrong:)' gradle.log | head -20 | tr '\n' '%' | sed 's/%/%0A/g')
+          if [ -n "$said" ]; then
+            echo "::error title=Gradle::${said}"
+          else
+            echo "::error title=Gradle::$(tail -20 gradle.log | tr '\n' '%' | sed 's/%/%0A/g')"
+          fi
 
       # What actually came out. A release signed with the shared debug key must never leave this
       # job, and the only way to know is to look at the APK rather than at the intent.
