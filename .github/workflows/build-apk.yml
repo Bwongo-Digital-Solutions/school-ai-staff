@@ -258,11 +258,47 @@ jobs:
           fi
           echo "Tag ${TAG} is free."
 
+      # The release page is where a teacher actually lands, so it carries the two one-tap installs
+      # rather than only the file. Written per release so the version and the links always agree.
+      - name: Write the install section
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          repo_url="${SERVER}/${REPO}"
+          apk_url="${repo_url}/releases/latest/download/school-ai-staff.apk"
+          # Obtainium reads its action from the URI host, so there is no slash after the scheme.
+          obtainium="obtainium://add/$(printf '%s' "$repo_url" | sed 's|:|%3A|g; s|/|%2F|g')"
+
+          cat > release-notes.md <<NOTES
+          ## Install on your phone
+
+          **Android will warn you about installing outside the Play Store.** That is expected — this app is not on it.
+
+          | | |
+          | --- | --- |
+          | **Obtainium** | [Add this app](${obtainium}) — tracks these releases and offers each new version as an update. Get Obtainium from [F-Droid](https://f-droid.org/en/packages/dev.imranr.obtainium/). |
+          | **Komi Store** | Open \`${repo_url}\` in the app, or paste it into its search box. Get Komi Store from [F-Droid](https://f-droid.org/en/packages/zed.rainxch.githubstore/). |
+          | **Neither** | Download [school-ai-staff-${TAG}.apk](${repo_url}/releases/download/${TAG}/school-ai-staff-${TAG}.apk) below and open it. |
+
+          \`school-ai-staff.apk\` always points at the newest release:
+          \`${apk_url}\`
+
+          Your school's sign-in page shows QR codes for the first two, which is the quickest way on a phone.
+
+          ---
+          NOTES
+          cat release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           name: ${{ needs.version.outputs.tag }}
           files: out/*.apk
+          body_path: release-notes.md
+          # Appended under the install section, so what changed is still there.
           generate_release_notes: true
           # Komi Store and Obtainium both read the newest release. A draft or a prerelease is
           # invisible to them, so neither is ever what this should produce.
