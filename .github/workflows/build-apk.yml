@@ -168,11 +168,65 @@ jobs:
         env:
           CI: '1'
 
+      # Sign with the project's own key, not the one every React Native project ships with.
+      #
+      # prebuild wires the release build to the template's debug.keystore — CN=Android Debug, alias
+      # androiddebugkey, password `android`, byte-identical in every RN project in the world.
+      # Android accepts an update from whoever holds the signing key, so an APK signed with that one
+      # can be replaced on a teacher's phone by anybody who cares to build one.
+      #
+      # The key is written to disk only for the length of this job. See "Signing" in the README for
+      # how to generate it, and for the one-off cost: a phone holding a debug-signed build cannot
+      # update over this and has to uninstall first.
+      - name: Sign the release with the project key
+        if: needs.version.outputs.release == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set, so this release would be signed with the React Native debug key that every project shares. Refusing to publish it — see Signing in the README."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          echo "Keystore decoded: $(wc -c < android/app/release.keystore) bytes"
+
+          {
+            echo "ESCHOOL_UPLOAD_STORE_FILE=release.keystore"
+            echo "ESCHOOL_UPLOAD_STORE_PASSWORD=${KEYSTORE_PASSWORD}"
+            echo "ESCHOOL_UPLOAD_KEY_ALIAS=${KEY_ALIAS}"
+            echo "ESCHOOL_UPLOAD_KEY_PASSWORD=${KEY_PASSWORD}"
+          } >> android/gradle.properties
+
+          node scripts/use-release-signing.mjs
+
       - name: Assemble release APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
+
+      # What actually came out. A release signed with the shared debug key must never leave this
+      # job, and the only way to know is to look at the APK rather than at the intent.
+      - name: Check the APK is not debug-signed
+        if: needs.version.outputs.release == 'true'
+        working-directory: android
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          signer=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$signer" verify --print-certs "$apk" | tee signer.txt
+
+          if grep -qi 'CN=Android Debug' signer.txt; then
+            echo "::error::The release APK is signed with the Android debug certificate. It must not be published."
+            exit 1
+          fi
+          echo "Signed with a non-debug certificate."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
