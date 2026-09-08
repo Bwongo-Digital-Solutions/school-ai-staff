@@ -231,12 +231,29 @@ jobs:
           fi
           echo "Keystore opens, and holds the key '$KEY_ALIAS'."
 
+          # The leading blank line is load-bearing. Expo's generated gradle.properties ends without
+          # a trailing newline — the last line is `android.extraMavenRepos=[]` — so appending
+          # directly produced `android.extraMavenRepos=[]ESCHOOL_UPLOAD_STORE_FILE=release.keystore`:
+          # one corrupted property, and ESCHOOL_UPLOAD_STORE_FILE never defined at all. Gradle then
+          # failed on `file(ESCHOOL_UPLOAD_STORE_FILE)` with an unknown property, which is what broke
+          # the first signed release.
           {
+            echo ""
             echo "ESCHOOL_UPLOAD_STORE_FILE=release.keystore"
             echo "ESCHOOL_UPLOAD_STORE_PASSWORD=${KEYSTORE_PASSWORD}"
             echo "ESCHOOL_UPLOAD_KEY_ALIAS=${KEY_ALIAS}"
             echo "ESCHOOL_UPLOAD_KEY_PASSWORD=${KEY_PASSWORD}"
           } >> android/gradle.properties
+
+          # Read them back. A properties file that silently lost a line is exactly the failure this
+          # step just caused, and it is invisible until Gradle is most of the way through a build.
+          for prop in ESCHOOL_UPLOAD_STORE_FILE ESCHOOL_UPLOAD_STORE_PASSWORD ESCHOOL_UPLOAD_KEY_ALIAS ESCHOOL_UPLOAD_KEY_PASSWORD; do
+            grep -q "^${prop}=." android/gradle.properties || {
+              echo "::error::${prop} did not make it into android/gradle.properties, so the build would fail on an unknown property."
+              exit 1
+            }
+          done
+          echo "All four signing properties are set."
 
           node scripts/use-release-signing.mjs
 
