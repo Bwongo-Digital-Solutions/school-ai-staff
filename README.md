@@ -70,6 +70,11 @@ that triggered it is a loop waiting to be tripped, and a tag pushed with
 
 - **Skip a release** by putting `[no release]` in the merge commit message. A README
   fix does not need a version.
+- **Releases are serialised.** Two merges a minute apart once both read the tag list before either
+  had released, both settled on the same version, and the second overwrote the first's APK — leaving
+  the tag on one commit and the binary on another. One release runs at a time now, and a run that
+  finds its tag already taken stops rather than publishing over it. If three merges land at once the
+  middle one may go unreleased; the newest code always ships, which is the part that matters.
 - **Name a version yourself** — a minor or a major — by pushing that tag (`1.1.0` or
   `v1.1.0`, both work). The build follows it, and the next automatic patch bump
   continues from there.

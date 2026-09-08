@@ -18,6 +18,22 @@ on:
       - '[0-9]*'
   workflow_dispatch:
 
+# One release at a time, per ref.
+#
+# Not a precaution — this was watched happening. Two pull requests merged a minute apart, both runs
+# read the tag list before either had released, both settled on 1.0.1, and both published to it. The
+# tag ended up on the newer commit while the APK attached to it came from the older one, because
+# that run finished last. Every phone would have installed a build that was not the code the release
+# named.
+#
+# Serialised, the second run's `version` job starts after the first release exists, sees its tag, and
+# takes the next number. `cancel-in-progress: false` because a release that has already begun must
+# finish; the cost is that a third merge arriving while one waits replaces the waiting one, so a
+# middle commit can go unreleased. The newest code always ships, which is the property that matters.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # What version this build is, decided in one place because three things need to agree: the tag,
   # the `version` a phone shows, and the `versionCode` Android compares to decide whether an APK is
@@ -209,6 +225,23 @@ jobs:
           cp "$built" "out/school-ai-staff.apk"
           cp "$built" "out/school-ai-staff-${TAG}.apk"
           ls -l out
+
+      # A belt to the concurrency group's braces. If the tag exists already then something raced
+      # anyway, and publishing over it would silently replace a release's APK with a different
+      # build — the exact failure this is here to prevent. Better a red main somebody looks at.
+      - name: Refuse to publish over a release that already exists
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          # ls-remote against the URL rather than a remote, because this job has no checkout and
+          # does not need one for a single question about a tag.
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags "$REPO_URL" "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists, so two runs picked the same version. Not publishing over the release that is already there — its APK would be replaced by a different build. Re-run this workflow once the other has finished, or push the next tag by hand."
+            exit 1
+          fi
+          echo "Tag ${TAG} is free."
 
       - uses: softprops/action-gh-release@v2
         with:
