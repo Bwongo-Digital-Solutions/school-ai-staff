@@ -1,0 +1,26 @@
+The staff companion to a school's e-School system. A teacher, matron, bursar, cook or
+gate keeper scans a student's ID card and sees exactly the part of that student's record
+their job needs — and nothing else.
+
+What a scan shows is decided by the server and shaped by the role, so a gate keeper's
+screen carries no fees and a cook's carries no contact details.
+
+Features
+* Scan a student ID card with the camera, or search by name
+* Marks: record and review, by class and subject
+* Fees: balances and payment history, for the roles that handle money
+* Dormitories: beds and roll call, for the matron
+* Gate: passes, check in and check out, with the day's movement log
+* Roll call: call the register for a class, or scan cards at the door
+* Exam clearance: granted by a bursar, checked at the door by an invigilator
+* Notifications: staff messages and school events
+* Assistant: chat and search over school data, for administrators and teachers
+* Dark and light themes
+
+This app is a client. It holds no school records of its own and asks for a login before
+it shows anything. It needs the address of your school's own server, which you set on the
+sign-in screen; your school's administrator will give you that address, and usually a QR
+code that fills it in for you.
+
+Built for schools that cannot rely on a fast connection or a Play Store account: the
+server can be on the school's own network, and the app is distributed as a plain APK.

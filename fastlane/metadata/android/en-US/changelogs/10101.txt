@@ -1,0 +1,2 @@
+Automatic releases, and one-tap install links on every release page.
+The app is now signed with the project release key rather than a debug key.
