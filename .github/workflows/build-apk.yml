@@ -74,10 +74,25 @@ jobs:
             major=$(printf '%s' "$latest" | cut -d. -f1)
             minor=$(printf '%s' "$latest" | cut -d. -f2)
             patch=$(printf '%s' "$latest" | cut -d. -f3)
-            # A patch bump per merge. Deciding that a change is a minor or a major one is a
-            # judgement, and a judgement belongs in a tag somebody pushed on purpose — which the
-            # tag trigger above still allows, and which this then continues from.
-            tag="${prefix}${major}.${minor}.$((patch + 1))"
+            # A patch bump per merge is the floor, not the rule.
+            next="${major}.${minor}.$((patch + 1))"
+
+            # Deciding that a change is a minor or a major one is a judgement, and app.json is where
+            # that judgement is written down. Setting `expo.version` above the highest tag names the
+            # next release; leaving it alone lets the patch bump carry on. This is why it is read
+            # rather than only written: pushing a tag by hand also works, but it is a thing somebody
+            # has to remember and cannot be reviewed, and a version is a decision about the software
+            # that belongs in the software.
+            declared=$(python3 -c "import json;print(json.load(open('app.json'))['expo'].get('version','0.0.0'))")
+            case "$declared" in
+              [0-9]*.[0-9]*.[0-9]*) ;;
+              *) declared="0.0.0" ;;
+            esac
+
+            # Whichever is higher. Once a declared version has been released the tag overtakes it,
+            # so a stale app.json cannot pin the version or cause a second release of one.
+            version=$(printf '%s\n%s\n' "$next" "$declared" | sort -V | tail -1)
+            tag="${prefix}${version}"
             release=true
           else
             # A working branch. Build it, so a broken build is caught before it is merged, but do

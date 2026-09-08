@@ -75,9 +75,13 @@ that triggered it is a loop waiting to be tripped, and a tag pushed with
   the tag on one commit and the binary on another. One release runs at a time now, and a run that
   finds its tag already taken stops rather than publishing over it. If three merges land at once the
   middle one may go unreleased; the newest code always ships, which is the part that matters.
-- **Name a version yourself** — a minor or a major — by pushing that tag (`1.1.0` or
-  `v1.1.0`, both work). The build follows it, and the next automatic patch bump
-  continues from there.
+- **Name a version yourself** — a minor or a major — by setting `expo.version` in
+  `app.json` above the highest tag. The next merge releases exactly that, and patch
+  bumps carry on from it. Once that version has been released the tag overtakes the
+  file, so leaving a stale number in `app.json` can neither pin the version nor
+  release one twice. Pushing the tag by hand still works too (`1.1.0` or `v1.1.0`),
+  but a version is a decision about the software and belongs in the software, where
+  it can be reviewed like any other change.
 - `versionCode` comes from the version, `1.2.3` becoming `10203`, so the two cannot
   drift. Android compares only that number when deciding whether an APK is an
   upgrade, and a stale one fails by silently not offering to install.

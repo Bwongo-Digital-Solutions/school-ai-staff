@@ -2,7 +2,7 @@
   "expo": {
     "name": "Staff App",
     "slug": "staff-app-native",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#161826",
@@ -41,7 +41,7 @@
     },
     "android": {
       "package": "com.bwongo.staffapp",
-      "versionCode": 1,
+      "versionCode": 10100,
       "backgroundColor": "#161826",
       "permissions": [
         "CAMERA",
