@@ -3,11 +3,13 @@ name: Build Android APK
 on:
   push:
     branches:
+      # main is where a release comes from — see the `version` and `release` jobs below.
+      - main
       # Any working branch, rather than one named branch. The single name here meant that moving
       # the work onto a new branch silently stopped producing APKs, with nothing to notice.
       - claude/**
     tags:
-      # A tag is how a build becomes a release. See the `release` job at the bottom.
+      # A tag pushed by hand still releases, for a version somebody wants to name themselves.
       #
       # Both shapes, because this repository already tags plain semver — `1.0.0`, not `v1.0.0` —
       # and a trigger that only matched the `v` form would have sat there doing nothing while
@@ -17,8 +19,80 @@ on:
   workflow_dispatch:
 
 jobs:
+  # What version this build is, decided in one place because three things need to agree: the tag,
+  # the `version` a phone shows, and the `versionCode` Android compares to decide whether an APK is
+  # an upgrade. When those disagree the failure is silent — the install just doesn't offer itself.
+  version:
+    name: Work out the version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      version: ${{ steps.pick.outputs.version }}
+      code: ${{ steps.pick.outputs.code }}
+      release: ${{ steps.pick.outputs.release }}
+
+    steps:
+      # Every tag, because the next version is the highest one that exists plus one.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: pick
+        name: The next version
+        env:
+          # A merge that should not ship — a README fix, a workflow change — says so in the commit
+          # message. Nothing else here has to be remembered.
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            # Somebody named this version. Use it exactly.
+            tag="${GITHUB_REF_NAME}"
+            release=true
+          elif [ "${GITHUB_REF_NAME}" = "main" ] && ! printf '%s' "${HEAD_MESSAGE}" | grep -qF '[no release]'; then
+            latest=$(git tag --list --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+            latest=${latest:-1.0.0}
+            prefix=""
+            case "$latest" in v*) prefix="v"; latest="${latest#v}";; esac
+            major=$(printf '%s' "$latest" | cut -d. -f1)
+            minor=$(printf '%s' "$latest" | cut -d. -f2)
+            patch=$(printf '%s' "$latest" | cut -d. -f3)
+            # A patch bump per merge. Deciding that a change is a minor or a major one is a
+            # judgement, and a judgement belongs in a tag somebody pushed on purpose — which the
+            # tag trigger above still allows, and which this then continues from.
+            tag="${prefix}${major}.${minor}.$((patch + 1))"
+            release=true
+          else
+            # A working branch. Build it, so a broken build is caught before it is merged, but do
+            # not put a version on it.
+            tag=""
+            release=false
+          fi
+
+          version="${tag#v}"
+          version="${version:-0.0.0}"
+
+          # Android compares versionCode, an integer, and refuses anything that is not higher than
+          # what is installed. Derived from the semver so the two can never drift: 1.2.3 -> 10203.
+          major=$(printf '%s' "$version" | cut -d. -f1)
+          minor=$(printf '%s' "$version" | cut -d. -f2)
+          patch=$(printf '%s' "$version" | cut -d. -f3)
+          code=$(( major * 10000 + minor * 100 + patch ))
+          [ "$code" -gt 0 ] || code=1
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "code=$code"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Building $version (tag '${tag:-none}', versionCode $code, release $release)"
+
   apk:
     name: Assemble release APK
+    needs: version
     runs-on: ubuntu-latest
 
     steps:
@@ -36,6 +110,27 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Stamped into the checkout rather than committed back to main. A workflow that commits to
+      # the branch it is triggered by is a loop waiting to be tripped, and the version is a fact
+      # about a build, not about the source: the tag already records it.
+      - name: Stamp the version
+        if: needs.version.outputs.release == 'true'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          CODE: ${{ needs.version.outputs.code }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            app.expo.version = process.env.VERSION;
+            app.expo.android = { ...app.expo.android, versionCode: Number(process.env.CODE) };
+            fs.writeFileSync("app.json", JSON.stringify(app, null, 2) + "\n");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          grep -E '"version"|"versionCode"' app.json
 
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
@@ -80,14 +175,13 @@ jobs:
   # Codeberg, Forgejo or Gitea and has no direct-file source at all. A release is the one shape both
   # can read.
   #
-  # Tags only, so an ordinary push still just builds. And note the honest limit: while this
-  # repository is private, a release is still only reachable with a token — which a QR code must
-  # never carry. This job is what makes the app installable the day the repository is made public;
-  # it does not make that decision.
+  # The tag is created here, by the release itself, rather than pushed by an earlier job. That is
+  # not a style choice: a tag pushed with GITHUB_TOKEN does not trigger another workflow, so a
+  # "tag now, build on the tag" split would tag main forever and never build anything.
   release:
-    name: Attach the APK to the release
-    needs: apk
-    if: startsWith(github.ref, 'refs/tags/')
+    name: Publish the release
+    needs: [version, apk]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,15 +192,32 @@ jobs:
           name: staff-app-release-apk
           path: apk
 
-      # Named for the tag rather than left as app-release.apk, so a phone that has downloaded two
-      # of them can tell which is which.
-      - name: Name the file after the version
+      # Two names for one file, on purpose.
+      #
+      #   school-ai-staff.apk          — the same name in every release, which is what makes
+      #                                  /releases/latest/download/school-ai-staff.apk work. That
+      #                                  address never changes, so a QR code printed today still
+      #                                  installs next term's build.
+      #   school-ai-staff-<tag>.apk    — so a phone holding two downloads can tell them apart.
+      - name: Name the file
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
         run: |
+          set -euo pipefail
+          built=$(find apk -name '*.apk' | head -1)
           mkdir -p out
-          cp "$(find apk -name '*.apk' | head -1)" "out/school-ai-staff-${GITHUB_REF_NAME}.apk"
+          cp "$built" "out/school-ai-staff.apk"
+          cp "$built" "out/school-ai-staff-${TAG}.apk"
           ls -l out
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
           files: out/*.apk
           generate_release_notes: true
+          # Komi Store and Obtainium both read the newest release. A draft or a prerelease is
+          # invisible to them, so neither is ever what this should produce.
+          draft: false
+          prerelease: false
+          make_latest: true
