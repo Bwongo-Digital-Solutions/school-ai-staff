@@ -56,9 +56,24 @@ export const LEVEL_LABELS = {
   tertiary: 'Tertiary',
 };
 
-/** Only an admin or a teacher gets the roster, the school figures and the assistant. */
-export const hasRoster = (user) =>
-  !!user && (user.role === 'admin' || user.role === 'teacher');
+/**
+ * Who gets the roster, the school figures and the assistant.
+ *
+ * The server's TEACHING_ROLES exactly (server/auth/roles.mjs). `students` is not listed in
+ * DB_TABLE_ROLES, so it falls to DB_DEFAULT_ROLES, which is that list — meaning a head teacher may
+ * already read every student record through the API. This check used to name `admin` and `teacher`
+ * by hand and so refused them here, which was drift rather than a decision: the head teacher runs
+ * the school and is the one role that answers for the whole roll.
+ *
+ * Named as a list rather than a chain of `||` so the next role added is one edit, and so the thing
+ * it has to agree with is written down beside it.
+ *
+ * `accountant` and `bursar` are absent on purpose. The server leaves them out of TEACHING_ROLES
+ * too, so their scan-for-payment-status screen is agreement and not an oversight.
+ */
+const ROSTER_ROLES = ['admin', 'head_teacher', 'teacher'];
+
+export const hasRoster = (user) => !!user && ROSTER_ROLES.includes(user.role);
 
 export const allowedTabs = (user) =>
   (hasRoster(user) ? TABS : TABS.filter((t) => t !== 'students' && t !== 'assistant'));
