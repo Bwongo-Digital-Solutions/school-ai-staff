@@ -27,6 +27,19 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  /* The second half of a sign-in, for a school that has switched on two-factor. Holding the
+     challenge rather than the password is the point: the password has done its job by the time this
+     is set, and keeping it in component state through another round trip is a habit worth not
+     having. */
+  const [challenge, setChallenge] = useState('');
+  const [code, setCode] = useState('');
+
+  const finish = (user) => {
+    if (!user) throw new ApiError('Sign in failed.', 0);
+    alertSuccess('Signed in', user.display_name || '');
+    onSignedIn(user);
+  };
+
   const handleSignIn = async () => {
     setError('');
     if (!email.trim() || !password) {
@@ -35,16 +48,47 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
     }
     setBusy(true);
     try {
-      const user = await schoolApi.signIn(email.trim(), password);
-      if (!user) throw new ApiError('Sign in failed.', 0);
-      alertSuccess('Signed in', user.display_name || '');
-      onSignedIn(user);
+      const result = await schoolApi.signIn(email.trim(), password);
+
+      if (result && result.mfaRequired) {
+        setChallenge(result.challenge || '');
+        setPassword('');
+        setCode('');
+        return;
+      }
+
+      finish(result && result.user);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed.');
       alertError('Sign in failed', err instanceof ApiError ? err : 'Sign in failed.');
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleVerify = async () => {
+    setError('');
+    if (code.trim().length < 6) {
+      setError('Type the six digits from your authenticator app.');
+      return;
+    }
+    setBusy(true);
+    try {
+      finish(await schoolApi.verifyCode(challenge, code.trim()));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Sign in failed.');
+      alertError('Sign in failed', err instanceof ApiError ? err : 'Sign in failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* There is no way back to the password field except starting over. A code step that can be
+     dismissed is a code step that can be skipped. */
+  const startOver = () => {
+    setChallenge('');
+    setCode('');
+    setError('');
   };
 
   return (
@@ -69,9 +113,51 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
           )}
         </View>
 
-        <Text style={styles.heading}>Staff sign in</Text>
-        <Text style={styles.subtext}>{tagline ? `${schoolName} · ${tagline}` : schoolName}</Text>
+        <Text style={styles.heading}>{challenge ? 'One more step' : 'Staff sign in'}</Text>
+        <Text style={styles.subtext}>
+          {challenge
+            ? 'Open your authenticator app and type the six digits'
+            : (tagline ? `${schoolName} · ${tagline}` : schoolName)}
+        </Text>
 
+        {challenge ? (
+          <View style={styles.form}>
+            <Text style={styles.fieldLabel}>Code from your authenticator app</Text>
+            <TextInput
+              value={code}
+              onChangeText={setCode}
+              style={styles.input}
+              placeholder="000000"
+              placeholderTextColor={colors.neutral[600]}
+              /* A numeric pad rather than a full keyboard, and one-time-code so the phone offers
+                 the digits it has just shown in a notification. */
+              keyboardType="number-pad"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
+              maxLength={6}
+              autoFocus
+              editable={!busy}
+              onSubmitEditing={handleVerify}
+              returnKeyType="go"
+            />
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Button
+              label={busy ? 'Checking…' : 'Sign in'}
+              variant="primary"
+              onPress={handleVerify}
+              loading={busy}
+              style={styles.signInButton}
+            />
+            <Button label="Start again" variant="ghost" onPress={startOver} disabled={busy} />
+
+            <Text style={styles.mfaNote}>
+              Lost the phone with your authenticator on it? An administrator at your school can clear
+              it from your account, and you can enrol a new one.
+            </Text>
+          </View>
+        ) : (
         <View style={styles.form}>
           <Text style={styles.fieldLabel}>Email</Text>
           <TextInput
@@ -113,6 +199,7 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
             style={styles.signInButton}
           />
         </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -198,6 +285,14 @@ const createStyles = (colors) =>
       fontSize: 13,
       color: colors.status.red,
       marginTop: spacing.lg,
+      textAlign: 'center',
+    },
+    mfaNote: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      lineHeight: 18,
+      color: colors.neutral[600],
+      marginTop: spacing.xl,
       textAlign: 'center',
     },
     signInButton: {

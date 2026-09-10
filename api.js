@@ -306,8 +306,35 @@ export const schoolApi = {
 
   /* issueToken asks the server to put the session in the body as well as the cookie, because this
      client cannot keep a cookie. Without it every role-gated endpoint refuses us. */
+  /**
+   * Signing in, which now has two possible endings.
+   *
+   * A school that has switched on two-factor sign-in answers the password with a *challenge* and no
+   * session, and the six digits from an authenticator app are what finishes it. Returning the shape
+   * rather than the user lets the screen tell the two apart; a phone that could only handle the old
+   * ending would simply stop being able to sign in the day a school enrolled.
+   */
   signIn: (email, password) =>
     post('/api/functions/auth', { action: 'signin', email, password, issueToken: true })
+      .then(async (d) => {
+        if (d && d.mfaRequired) return { mfaRequired: true, challenge: d.challenge };
+        if (d && d.token) await api.setToken(d.token);
+        return { user: d ? d.user : null };
+      }),
+
+  /**
+   * The code half of a sign-in.
+   *
+   * The challenge stands in for the password already accepted, so the password is typed once and is
+   * never held on the phone waiting for a second round trip.
+   *
+   * `trustDevice` is not offered. It is a cookie mechanism, and this app carries a bearer token
+   * rather than a cookie jar — asking for a code once per phone would need somewhere to keep the
+   * device token that is as well protected as the session, which is a decision worth making on its
+   * own rather than as a footnote to this one.
+   */
+  verifyCode: (challenge, code) =>
+    post('/api/functions/auth', { action: 'signin_verify', challenge, code, issueToken: true })
       .then(async (d) => {
         if (d && d.token) await api.setToken(d.token);
         return d ? d.user : null;
