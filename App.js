@@ -24,6 +24,7 @@ import ScannerScreen from './screens/ScannerScreen';
 import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
+import PrintClassScreen from './screens/PrintClassScreen';
 import PendingGateScreen from './screens/PendingGateScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
 import MatronScreen from './screens/MatronScreen';
@@ -495,8 +496,17 @@ function Root() {
             error={error}
             onRetry={retry}
             onOpenStudent={openStudent}
+            /* A class set is marks and money for thirty families at once, so the button is only
+               drawn for the roles the server would let through anyway. */
+            onPrintClass={
+              ['admin', 'teacher'].includes((user && user.role) || '')
+                ? () => push({ name: 'printClass' })
+                : undefined
+            }
           />
         )}
+
+        {route.name === 'printClass' && <PrintClassScreen user={user} onBack={pop} />}
 
         {route.name === 'assistant' && (
           <AssistantScreen
