@@ -34,6 +34,7 @@ import RollCallScreen from './screens/RollCallScreen';
 import MessagesScreen from './screens/MessagesScreen';
 import ComposeScreen from './screens/ComposeScreen';
 import AssistantScreen from './screens/AssistantScreen';
+import { LanguageProvider } from './i18n';
 
 const STORAGE = {
   user: 'kps.user',
@@ -61,13 +62,17 @@ const EMPTY_CHAT = {
 export default function App() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <BrandingProvider>
-          <Root />
-          {/* Above every screen, so an action can report itself from wherever it ran. */}
-          <AlertHost />
-        </BrandingProvider>
-      </ToastProvider>
+      {/* Outside everything that renders words, including the alert host — a failure reported from
+          the gate is one of the first things anybody reads. */}
+      <LanguageProvider>
+        <ToastProvider>
+          <BrandingProvider>
+            <Root />
+            {/* Above every screen, so an action can report itself from wherever it ran. */}
+            <AlertHost />
+          </BrandingProvider>
+        </ToastProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

@@ -4,7 +4,8 @@ import { ChatCircleDots, PencilSimple, Prohibit, SignOut, WarningCircle } from '
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi } from '../api';
 import { decideGatePass } from '../gate';
-import { AUDIENCE_LABELS } from '../roles';
+import { audienceLabel } from '../roles';
+import { useT } from '../i18n';
 import { dateTime, humanise } from '../format';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
@@ -15,10 +16,10 @@ import { alertSuccess, alertError } from '../alerts';
 
 /* One bell for two things: staff writing to each other, and the system reporting something
    that happened. The server decides who a message reaches; this only renders the feed. */
-function audienceLabel(m) {
-  if (m.audience_kind === 'all') return AUDIENCE_LABELS.all;
-  if (m.audience_kind === 'user') return 'Direct';
-  return AUDIENCE_LABELS[m.audience_value] || humanise(m.audience_value);
+function describeAudience(m, t) {
+  if (m.audience_kind === 'all') return t('audience.all');
+  if (m.audience_kind === 'user') return t('messages.direct');
+  return audienceLabel(m.audience_value, t, humanise);
 }
 
 export default function MessagesScreen({
@@ -30,6 +31,7 @@ export default function MessagesScreen({
   onBack,
   onOpenPendingGate,
 }) {
+  const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toast = useToast();
@@ -180,9 +182,8 @@ export default function MessagesScreen({
                     </View>
                     <Text style={styles.text}>{m.body}</Text>
                     <Text style={styles.meta}>
-                      {`${isEvent ? 'System' : m.sender_name || 'Staff'} · ${audienceLabel(
-                        m,
-                      )} · ${dateTime(m.created_at)}`}
+                      {`${isEvent ? t('messages.system') : m.sender_name || t('messages.staff')} · ${
+                        describeAudience(m, t)} · ${dateTime(m.created_at)}`}
                     </Text>
 
                     {m.event_type === 'gate_permission' && openPermissions[m.student_id] ? (

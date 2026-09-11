@@ -19,7 +19,8 @@ import {
 } from 'react-native';
 import { Check, UserPlus } from 'phosphor-react-native';
 import { useTheme, spacing, fonts, radius, type } from '../theme';
-import { LEVEL_LABELS, levelForGrade } from '../roles';
+import { LEVEL_LABEL_KEYS, levelForGrade } from '../roles';
+import { useT } from '../i18n';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
 import Select from '../components/Select';
@@ -50,6 +51,7 @@ const EMPTY = {
 
 export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [form, setForm] = useState(EMPTY);
@@ -291,7 +293,7 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
           {/* School requirements, for the class chosen above. The list changes when the class
               changes, which is the whole point of scoping it by class. */}
           <Text style={styles.sectionLabel}>
-            {level ? `Requirements · ${LEVEL_LABELS[level]}` : 'Requirements'}
+            {level ? `${t('register.requirements')} · ${t(LEVEL_LABEL_KEYS[level])}` : t('register.requirements')}
           </Text>
           {!form.gradeLevel ? (
             <Text style={styles.pickerHint}>Choose a class to see what this student should bring.</Text>

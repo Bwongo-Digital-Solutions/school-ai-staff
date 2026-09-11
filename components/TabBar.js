@@ -3,16 +3,19 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { House, QrCode, Users, Sparkle, UserCircle } from 'phosphor-react-native';
 import { useTheme, spacing, fonts } from '../theme';
 import { allowedTabs } from '../roles';
+import { useT } from '../i18n';
 
+/* The label is a key; the tab bar is rendered by a screen that has `t`. */
 const TABS = [
-  { key: 'home', label: 'Home', icon: House },
-  { key: 'scan', label: 'Scan', icon: QrCode },
-  { key: 'students', label: 'Students', icon: Users },
-  { key: 'assistant', label: 'Assistant', icon: Sparkle },
-  { key: 'profile', label: 'Profile', icon: UserCircle },
+  { key: 'home', label: 'tab.home', icon: House },
+  { key: 'scan', label: 'tab.scan', icon: QrCode },
+  { key: 'students', label: 'tab.students', icon: Users },
+  { key: 'assistant', label: 'tab.assistant', icon: Sparkle },
+  { key: 'profile', label: 'tab.profile', icon: UserCircle },
 ];
 
 export default function TabBar({ active, user, onSelect }) {
+  const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const visible = useMemo(() => {
@@ -38,7 +41,7 @@ export default function TabBar({ active, user, onSelect }) {
               weight={isActive ? 'fill' : 'regular'}
             />
             <Text style={[styles.label, { color }]} numberOfLines={1}>
-              {tab.label}
+              {t(tab.label)}
             </Text>
           </Pressable>
         );

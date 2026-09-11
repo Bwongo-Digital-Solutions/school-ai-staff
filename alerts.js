@@ -53,18 +53,26 @@ export function dismissAlert() {
   if (listener) listener(null);
 }
 
-/** An ApiError, a plain Error, or anything else that reached a catch block. */
-export function messageOf(error) {
-  if (!error) return 'Something went wrong.';
+/**
+ * An ApiError, a plain Error, or anything else that reached a catch block.
+ *
+ * `t` is optional and the English stays as the default, because this is called from plain code as
+ * well as from screens — a caller with no `t` to hand still gets a sentence rather than nothing.
+ */
+export function messageOf(error, t) {
+  const fallback = t ? t('common.somethingWrong') : 'Something went wrong.';
+  if (!error) return fallback;
   if (typeof error === 'string') return error;
-  return error.message || 'Something went wrong.';
+  return error.message || fallback;
 }
 
 /**
  * Reports an action that worked. Clears itself after SUCCESS_MS — nothing to tap.
  */
 export function alertSuccess(title, message) {
-  const ticket = show({ tone: 'success', title: String(title || 'Done'), message: message ? String(message) : '' });
+  /* An empty title falls through to whatever AlertHost calls this tone, which is where the words
+     for it now live — this module has no `t`, and a default written here could not be translated. */
+  const ticket = show({ tone: 'success', title: String(title || ''), message: message ? String(message) : '' });
   setTimeout(() => dismiss(ticket), SUCCESS_MS);
 }
 
@@ -74,7 +82,7 @@ export function alertSuccess(title, message) {
  * suggest a second helping was recorded.
  */
 export function alertWarning(title, message) {
-  const ticket = show({ tone: 'warning', title: String(title || 'Nothing to do'), message: message ? String(message) : '' });
+  const ticket = show({ tone: 'warning', title: String(title || ''), message: message ? String(message) : '' });
   setTimeout(() => dismiss(ticket), SUCCESS_MS);
 }
 
@@ -83,7 +91,7 @@ export function alertWarning(title, message) {
  * error nobody saw. `error` is whatever the catch block caught.
  */
 export function alertError(title, error) {
-  show({ tone: 'error', title: String(title || 'Failed'), message: messageOf(error), wait: true });
+  show({ tone: 'error', title: String(title || ''), message: messageOf(error), wait: true });
 }
 
 export default { alertSuccess, alertWarning, alertError, messageOf, subscribeToAlerts, dismissAlert };

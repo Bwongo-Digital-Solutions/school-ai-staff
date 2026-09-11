@@ -49,11 +49,19 @@ export const levelForGrade = (gradeLevel) => {
   return 'tertiary';
 };
 
-export const LEVEL_LABELS = {
-  kindergarten: 'Kindergarten',
-  primary: 'Primary',
-  secondary: 'Secondary',
-  tertiary: 'Tertiary',
+/* ------------------------------------------------------------------- what things are called ---
+
+   These were maps of English words, read straight into the UI. They are maps of *message keys*
+   now: this module has no `t` — it is imported by plain functions as well as by screens — so it
+   names the message and the caller says it.
+
+   `labelKeyFor…` rather than `…_LABELS` so a caller cannot accidentally render the key. */
+
+export const LEVEL_LABEL_KEYS = {
+  kindergarten: 'level.kindergarten',
+  primary: 'level.primary',
+  secondary: 'level.secondary',
+  tertiary: 'level.tertiary',
 };
 
 /**
@@ -80,47 +88,60 @@ export const allowedTabs = (user) =>
 
 /* The six roles the server recognises (server/auth/roles.mjs). The three that were missing here
    rendered as a raw role string — "head_teacher" — on every screen that shows a job title. */
-export const ROLE_LABELS = {
-  admin: 'Administrator',
-  head_teacher: 'Head Teacher',
-  accountant: 'Accountant',
-  bursar: 'Bursar',
-  teacher: 'Teacher',
-  support_staff: 'Support staff',
+export const ROLE_LABEL_KEYS = {
+  admin: 'role.admin',
+  head_teacher: 'role.head_teacher',
+  accountant: 'role.accountant',
+  bursar: 'role.bursar',
+  teacher: 'role.teacher',
+  support_staff: 'role.support_staff',
 };
 
-export const DESIGNATION_LABELS = {
-  bursar: 'Bursar',
-  askari: 'Gate keeper',
-  matron: 'Matron',
-  cook: 'Cook',
+export const DESIGNATION_LABEL_KEYS = {
+  bursar: 'designation.bursar',
+  askari: 'designation.askari',
+  matron: 'designation.matron',
+  cook: 'designation.cook',
 };
 
-/** The job title a staff member scans under — the designation when they have one. */
-export const roleLabel = (user) => {
+/**
+ * The job title a staff member scans under — the designation when they have one.
+ *
+ * Takes `t` rather than reaching for it, because this is called from plain code as well as from
+ * screens. Returns the raw role as a last resort, which is what it always did: a role the server
+ * has and this build does not shows up as itself rather than blank.
+ */
+export const roleLabel = (user, t) => {
   if (!user) return '';
-  return DESIGNATION_LABELS[user.designation] || ROLE_LABELS[user.role] || user.role || '';
+  const key = DESIGNATION_LABEL_KEYS[user.designation] || ROLE_LABEL_KEYS[user.role];
+  return key && t ? t(key) : user.role || '';
 };
 
 /** What this profile is for, shown where the blank school figures would otherwise puzzle. */
-export const scanPurpose = (user) =>
+export const scanPurposeKey = (user) =>
   ({
-    askari: 'Scan a student ID card to check their gate pass.',
-    cook: 'Scan a student ID card to check and record meals.',
-    matron: 'Scan a student ID card to see their dormitory and contacts.',
-  }[designationOf(user)] || 'Scan a student ID card to check their payment status.');
+    askari: 'purpose.askari',
+    cook: 'purpose.cook',
+    matron: 'purpose.matron',
+  }[designationOf(user)] || 'purpose.default');
 
 /* Audiences a message can be addressed to. Roles and designations share one map because
    the compose picker offers them in one list. */
-export const AUDIENCE_LABELS = {
-  all: 'All staff',
-  admin: 'Administrators',
-  head_teacher: 'Head Teacher',
-  accountant: 'Accountants',
-  bursar: 'Bursar',
-  teacher: 'Teachers',
-  support_staff: 'Support staff',
-  askari: 'Gate keepers',
-  matron: 'Matrons',
-  cook: 'Kitchen',
+export const AUDIENCE_LABEL_KEYS = {
+  all: 'audience.all',
+  admin: 'audience.admin',
+  head_teacher: 'audience.head_teacher',
+  accountant: 'audience.accountant',
+  bursar: 'audience.bursar',
+  teacher: 'audience.teacher',
+  support_staff: 'audience.support_staff',
+  askari: 'audience.askari',
+  matron: 'audience.matron',
+  cook: 'audience.cook',
+};
+
+/** An audience in words, falling back to whatever the server called it. */
+export const audienceLabel = (value, t, fallback) => {
+  const key = AUDIENCE_LABEL_KEYS[value];
+  return key && t ? t(key) : fallback ? fallback(value) : String(value || '');
 };
