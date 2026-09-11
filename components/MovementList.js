@@ -2,13 +2,15 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SignIn, SignOut, Prohibit } from 'phosphor-react-native';
 import { useTheme, spacing, fonts } from '../theme';
-import { formatTime, humanise } from '../format';
+import { formatTime } from '../format';
+import { useT } from '../i18n';
 import Badge from './Badge';
 
 /* One row per movement, whichever board it is shown on: the gate's log names the student,
    a single card's history does not, and the two otherwise read the same. */
 export default function MovementList({ movements = [], withNames = true, style }) {
   const { colors } = useTheme();
+  const { t, labelOf } = useT();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
@@ -34,14 +36,14 @@ export default function MovementList({ movements = [], withNames = true, style }
             <Icon size={19} color={tint} weight="regular" style={styles.icon} />
             <View style={styles.body}>
               <Text style={styles.title} numberOfLines={1}>
-                {name || humanise(m.direction)}
-                {name ? <Text style={styles.direction}>{`  ${m.direction}`}</Text> : null}
+                {name || labelOf(m.direction)}
+                {name ? <Text style={styles.direction}>{`  ${labelOf(m.direction)}`}</Text> : null}
               </Text>
               <Text style={styles.sub} numberOfLines={2}>
                 {detail}
               </Text>
             </View>
-            {declined ? <Badge label="Declined" tone="red" /> : null}
+            {declined ? <Badge label={t('movement.declined')} tone="red" /> : null}
           </View>
         );
       })}

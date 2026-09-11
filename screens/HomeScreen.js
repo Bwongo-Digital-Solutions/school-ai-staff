@@ -17,7 +17,8 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
-import { canRegisterStudents, hasRoster, isAskari, isMatron, roleLabel, scanPurpose } from '../roles';
+import { canRegisterStudents, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey } from '../roles';
+import { useT } from '../i18n';
 import { GATE_ACTIONS } from './GateConfirmScreen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
@@ -68,6 +69,7 @@ export default function HomeScreen({
   onOpenMatron,
 }) {
   const { colors, toggleTheme } = useTheme();
+  const { t } = useT();
   const { name: schoolName, logo } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -92,7 +94,7 @@ export default function HomeScreen({
             <Text style={styles.greeting} numberOfLines={1}>
               Hello, {(user && user.display_name) || 'there'}
             </Text>
-            {user ? <Chip label={roleLabel(user)} style={styles.chip} /> : null}
+            {user ? <Chip label={roleLabel(user, t)} style={styles.chip} /> : null}
           </View>
 
           <View style={styles.headerActions}>
@@ -154,7 +156,7 @@ export default function HomeScreen({
                     onPress={onOpenMatron}
                     style={styles.rollCallButton}
                   />
-                  <StateBlock message={scanPurpose(user)} style={styles.supportHint} />
+                  <StateBlock message={t(scanPurposeKey(user))} style={styles.supportHint} />
                 </>
               ) : isAskari(user) ? (
                 <>
@@ -171,7 +173,7 @@ export default function HomeScreen({
                   <GateLog styles={styles} />
                 </>
               ) : (
-                <StateBlock message={scanPurpose(user)} style={styles.supportHint} />
+                <StateBlock message={t(scanPurposeKey(user))} style={styles.supportHint} />
               )
             ) : (
               <>

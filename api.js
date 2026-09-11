@@ -5,6 +5,7 @@
    boot and mirrored synchronously) and the payload scrub below. */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { formatLocale } from './format';
 
 const BASE_KEY = 'kps.apiBase';
 const TOKEN_KEY = 'kps.sessionToken';
@@ -139,6 +140,11 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
       headers: {
         ...(init && init.headers),
         ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+        /* The server draws the report cards and receipts this app only links to, and none of that
+           text passes through the phone — so the language the reader chose has to travel with the
+           request. `formatLocale()` is the app's own choice, not the handset's, because those are
+           different questions and the app's is the one they answered. */
+        'Accept-Language': formatLocale(),
       },
       signal: ctrl.signal,
     });

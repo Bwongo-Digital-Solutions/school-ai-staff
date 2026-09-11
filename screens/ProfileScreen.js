@@ -7,11 +7,12 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
-import { Moon, Cloud, ArrowsClockwise, LockSimple, SignOut } from 'phosphor-react-native';
+import { Moon, Cloud, ArrowsClockwise, LockSimple, SignOut, Translate } from 'phosphor-react-native';
 import { useBranding } from '../branding';
 import { APP_FOOTER } from '../version';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
-import { hasRoster, roleLabel, scanPurpose } from '../roles';
+import { hasRoster, roleLabel, scanPurposeKey } from '../roles';
+import { LANGUAGES, LANGUAGE_LABELS, useT } from '../i18n';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
 import Button from '../components/Button';
@@ -26,6 +27,7 @@ export default function ProfileScreen({
   onSignOut,
 }) {
   const { colors, theme, toggleTheme } = useTheme();
+  const { t, language, setLanguage } = useT();
   const { name: schoolName } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -37,20 +39,25 @@ export default function ProfileScreen({
     setRefreshNote('');
     try {
       await onRefresh();
-      setRefreshNote('Data refreshed.');
+      setRefreshNote(t('profile.refreshed'));
     } catch (err) {
-      setRefreshNote(err.message || 'Refresh failed.');
+      setRefreshNote(err.message || t('profile.refreshFailed'));
     } finally {
       setRefreshing(false);
     }
   };
 
-  const displayName = (user && user.display_name) || 'Not signed in';
+  const displayName = (user && user.display_name) || t('profile.notSignedIn');
+
+  /* Two languages, so the row is a single button that names the *other* one — "Français" when you
+     are reading English. A picker for a choice between two is a sheet to open and a list to read
+     where one tap would do; this is the same judgement the theme row makes with its switch. */
+  const otherLanguage = LANGUAGES.find((code) => code !== language) || 'en';
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.title}>{t('profile.title')}</Text>
 
         <View style={styles.identity}>
           <View style={styles.avatar}>
@@ -64,14 +71,14 @@ export default function ProfileScreen({
               {(user && user.auth_email) || ''}
             </Text>
           </View>
-          {user ? <Chip label={roleLabel(user)} /> : null}
+          {user ? <Chip label={roleLabel(user, t)} /> : null}
         </View>
 
         <Card style={styles.listCard}>
           <DetailRow
             icon={Moon}
-            title="Light theme"
-            value="Switch between the dark and light palette"
+            title={t('profile.lightTheme')}
+            value={t('profile.lightThemeWhy')}
             action={
               <Switch
                 value={theme === 'light'}
@@ -81,13 +88,28 @@ export default function ProfileScreen({
               />
             }
           />
+          {/* Beside the theme, because they are the same kind of thing: a preference that belongs
+              to whoever is holding the phone, not to the school. */}
           <DetailRow
-            icon={Cloud}
-            title="Server"
-            value={apiBase || 'Not configured'}
+            icon={Translate}
+            title={t('profile.language')}
+            value={t('profile.languageWhy')}
             action={
               <Button
-                label="Change"
+                label={LANGUAGE_LABELS[otherLanguage]}
+                variant="secondary"
+                onPress={() => setLanguage(otherLanguage)}
+                style={styles.rowButton}
+              />
+            }
+          />
+          <DetailRow
+            icon={Cloud}
+            title={t('profile.server')}
+            value={apiBase || t('common.notConfigured')}
+            action={
+              <Button
+                label={t('common.change')}
                 variant="secondary"
                 onPress={onOpenSettings}
                 style={styles.rowButton}
@@ -97,19 +119,19 @@ export default function ProfileScreen({
           {!hasRoster(user) ? (
             <DetailRow
               icon={LockSimple}
-              title="Access"
-              value={scanPurpose(user)}
+              title={t('profile.access')}
+              value={t(scanPurposeKey(user))}
               isLast
             />
           ) : (
             <DetailRow
               icon={ArrowsClockwise}
-              title="Refresh data"
-              value={refreshNote || `${studentCount} students cached`}
+              title={t('profile.refreshData')}
+              value={refreshNote || t('profile.cached', { count: studentCount })}
               isLast
               action={
                 <Button
-                  label="Refresh"
+                  label={t('common.refresh')}
                   variant="secondary"
                   onPress={handleRefresh}
                   loading={refreshing}
@@ -121,14 +143,14 @@ export default function ProfileScreen({
         </Card>
 
         <Button
-          label="Sign out"
+          label={t('common.signOut')}
           icon={SignOut}
           variant="danger"
           onPress={onSignOut}
           style={styles.signOut}
         />
 
-        <Text style={styles.footNote}>{schoolName} · Staff App</Text>
+        <Text style={styles.footNote}>{schoolName} · {t('profile.staffApp')}</Text>
         <Text style={styles.footVersion}>{APP_FOOTER}</Text>
       </ScrollView>
     </SafeAreaView>

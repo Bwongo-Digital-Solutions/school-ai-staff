@@ -12,7 +12,8 @@ import {
 import { PaperPlaneTilt } from 'phosphor-react-native';
 import { useTheme, spacing, fonts } from '../theme';
 import { schoolApi } from '../api';
-import { AUDIENCE_LABELS } from '../roles';
+import { audienceLabel } from '../roles';
+import { useT } from '../i18n';
 import { humanise } from '../format';
 import Button from '../components/Button';
 import StateBlock from '../components/StateBlock';
@@ -22,6 +23,7 @@ import Field, { FormError } from '../components/Field';
 import { alertSuccess, alertError } from '../alerts';
 
 export default function ComposeScreen({ user, onSent, onBack }) {
+  const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -67,11 +69,11 @@ export default function ComposeScreen({ user, onSent, onBack }) {
       { value: 'all', label: 'Everybody' },
       ...roles.map((r) => ({
         value: `role:${r}`,
-        label: AUDIENCE_LABELS[r] || humanise(r),
+        label: audienceLabel(r, t, humanise),
       })),
       ...designations.map((d) => ({
         value: `designation:${d}`,
-        label: AUDIENCE_LABELS[d] || humanise(d),
+        label: audienceLabel(d, t, humanise),
       })),
       { value: 'user', label: 'One person…' },
     ];
@@ -82,7 +84,7 @@ export default function ComposeScreen({ user, onSent, onBack }) {
       ((directory && directory.staff) || []).map((u) => ({
         value: u.auth_email,
         label: `${u.display_name} — ${
-          AUDIENCE_LABELS[u.designation] || AUDIENCE_LABELS[u.role] || u.role
+          audienceLabel(u.designation, t) || audienceLabel(u.role, t, () => u.role)
         }`,
       })),
     [directory],
