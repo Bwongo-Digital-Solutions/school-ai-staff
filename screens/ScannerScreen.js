@@ -8,7 +8,9 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Animated,
+  AppState,
   Easing,
+  Linking,
   Vibration,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -55,7 +57,19 @@ export default function ScannerScreen({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, refreshPermission] = useCameraPermissions();
+
+  /* Once Android has been told not to ask again, the dialog never appears and the only way to
+     the camera is the device's own settings screen — which means the grant happens while this
+     app is in the background. The permission is read once on mount, so without this the screen
+     would still say the camera was blocked after the teacher had just allowed it, and the app
+     would have to be killed and reopened to notice. */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshPermission();
+    });
+    return () => subscription.remove();
+  }, [refreshPermission]);
 
   const [torch, setTorch] = useState(false);
   /* Where the found code sits in the frame, when the camera tells us. */
@@ -275,10 +289,18 @@ export default function ScannerScreen({
                 />
               </>
             ) : (
-              <Text style={styles.caption}>
-                Camera access is blocked. Enable it in your device settings, or use Manual
-                ID below.
-              </Text>
+              <>
+                <Text style={styles.caption}>
+                  Camera access is blocked. Turn it on in the device settings, or use Manual
+                  ID below.
+                </Text>
+                <Button
+                  label="Open settings"
+                  variant="primary"
+                  onPress={() => Linking.openSettings()}
+                  style={styles.permissionButton}
+                />
+              </>
             )}
           </>
         ) : (
