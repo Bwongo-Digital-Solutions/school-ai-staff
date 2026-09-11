@@ -5,6 +5,8 @@
  * catches the three ways a translation goes quietly wrong, none of which a reader would report as a
  * bug because the screen still renders.
  */
+import { readFileSync, readdirSync } from 'node:fs';
+
 import { en } from '../locales/en.js';
 import { fr } from '../locales/fr.js';
 import { translate } from '../i18n-core.js';
@@ -72,6 +74,65 @@ if (en[sample]) {
   console.log('counted message, both languages:');
   for (const [locale, count, text] of checks) console.log(`  ${locale} ${count} -> ${text}`);
 }
+
+/* --------------------------------------------------------- keys the source asks for ---------- */
+
+/**
+ * Every key the app actually looks up, checked against the catalogue.
+ *
+ * The web app gets this from TypeScript: `t` is typed against the English catalogue there, so a
+ * mistyped key is a build error. This app has no such net — `t('typo.key')` renders the key on
+ * somebody's screen and nothing objects. That is exactly how `roster.allStreams` reached a pushed
+ * branch in the web app during the one window where its typecheck was silently checking nothing.
+ *
+ * Two shapes are collected: `t('some.key')` calls, and the `'some.key'` strings held as values in
+ * the label maps (roles.js, AlertHost's TONES), which are looked up later rather than called here.
+ */
+const SOURCE_DIRS = ['screens', 'components'];
+const SOURCE_FILES = ['App.js', 'roles.js', 'alerts.js', 'api.js', 'format.js', 'branding.js', 'probe.js'];
+
+const sources = [];
+for (const dir of SOURCE_DIRS) {
+  const here = new URL(`../${dir}/`, import.meta.url);
+  for (const name of readdirSync(here)) {
+    if (name.endsWith('.js')) sources.push([`${dir}/${name}`, readFileSync(new URL(name, here), 'utf8')]);
+  }
+}
+for (const name of SOURCE_FILES) {
+  sources.push([name, readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')]);
+}
+
+/* Prefixes reached by building the key at runtime — `enum.${value}` in `labelOf`. Those cannot be
+   checked from here, and `labelOf` falls back to `humanise` for anything missing, so they are
+   deliberately exempt rather than reported as unused. */
+const DYNAMIC_PREFIXES = ['enum.'];
+
+/** The first segment of every key the catalogue defines — what makes a dotted string a key ask. */
+const NAMESPACES = new Set(Object.keys(en).map((key) => key.split('.')[0]));
+
+const asked = new Map();
+for (const [name, text] of sources) {
+  const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  for (const m of stripped.matchAll(/\bt\(\s*'([a-zA-Z][\w.]*)'/g)) {
+    asked.set(m[1], `${name}:${stripped.slice(0, m.index).split('\n').length}`);
+  }
+  /* Keys held as values: `fallbackTitle: 'alert.done'`, `admin: 'role.admin'`.
+     Only accepted when the first segment is a namespace the catalogue actually uses — otherwise
+     this matches every dotted string in value position, and reports `marksheet.jpg` and the
+     `kps.user` storage key as missing translations. */
+  for (const m of stripped.matchAll(/:\s*'([a-z][\w]*)\.([\w.]+)'/g)) {
+    if (!NAMESPACES.has(m[1])) continue;
+    asked.set(`${m[1]}.${m[2]}`, `${name}:${stripped.slice(0, m.index).split('\n').length}`);
+  }
+}
+
+for (const [key, where] of asked) {
+  if (key in en) continue;
+  if (DYNAMIC_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+  note(`${where} asks for "${key}", which no catalogue defines`);
+}
+
+console.log(`${asked.size} keys asked for by the source.`);
 
 console.log(`\n${Object.keys(en).length} English messages, ${Object.keys(fr).length} French.`);
 if (problems.length === 0) {

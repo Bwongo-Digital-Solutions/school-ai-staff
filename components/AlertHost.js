@@ -9,16 +9,21 @@ import { View, Text, Modal, Animated, Easing, StyleSheet } from 'react-native';
 import { CheckCircle, WarningCircle, XCircle } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { subscribeToAlerts, dismissAlert } from '../alerts';
+import { useT } from '../i18n';
 import Button from './Button';
 
+/* The words each tone falls back to when the caller named no title. Keys rather than words: this
+   is the modal every success, warning and failure in the app passes through — every gate scan,
+   every meal recorded — so it is the most-read text on the phone, and it was entirely English. */
 const TONES = {
-  success: { Icon: CheckCircle, colour: 'green', fallbackTitle: 'Done' },
-  warning: { Icon: WarningCircle, colour: 'amber', fallbackTitle: 'Nothing to do' },
-  error: { Icon: XCircle, colour: 'red', fallbackTitle: 'Failed' },
+  success: { Icon: CheckCircle, colour: 'green', fallbackTitle: 'alert.done' },
+  warning: { Icon: WarningCircle, colour: 'amber', fallbackTitle: 'alert.nothingToDo' },
+  error: { Icon: XCircle, colour: 'red', fallbackTitle: 'alert.failed' },
 };
 
 export default function AlertHost() {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [alert, setAlert] = useState(null);
@@ -66,13 +71,13 @@ export default function AlertHost() {
             <Icon size={44} color={accent} weight="fill" />
           </View>
 
-          <Text style={styles.title}>{alert.title || tone.fallbackTitle}</Text>
+          <Text style={styles.title}>{alert.title || t(tone.fallbackTitle)}</Text>
           {alert.message ? <Text style={styles.message}>{alert.message}</Text> : null}
 
           {/* Only a failure is worth a button. A success is already on its way out, and a
               button there would invite a tap that lands on the screen behind it. */}
           {alert.wait ? (
-            <Button label="OK" variant="primary" onPress={dismissAlert} style={styles.button} />
+            <Button label={t('common.ok')} variant="primary" onPress={dismissAlert} style={styles.button} />
           ) : null}
         </Animated.View>
       </View>
