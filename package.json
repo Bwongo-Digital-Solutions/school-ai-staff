@@ -9,7 +9,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "check:locales": "node scripts/check-locales.mjs"
+    "check:locales": "node scripts/check-locales.mjs",
+    "check:update": "node scripts/check-update.mjs",
+    "check": "node scripts/check-locales.mjs && node scripts/check-update.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",

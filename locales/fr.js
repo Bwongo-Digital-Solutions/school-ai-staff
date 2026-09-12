@@ -212,6 +212,12 @@ export const fr = {
   'students.enrolled': { one: '{count} inscrit', other: '{count} inscrits' },
   'students.matching': { one: '{count} sur {total}', other: '{count} sur {total}' },
 
+  /* ── a newer build is out ───────────────────────────────────────────────── */
+  'update.available': 'La version {version} est disponible',
+  'update.installed': 'Vous avez la version {version}.',
+  'update.install': "L'installer",
+  'update.dismiss': 'Pas maintenant',
+
 };
 
 export default fr;

@@ -197,6 +197,12 @@ export const en = {
   'students.enrolled': { one: '{count} enrolled', other: '{count} enrolled' },
   'students.matching': { one: '{count} of {total}', other: '{count} of {total}' },
 
+  /* ── a newer build is out ───────────────────────────────────────────────── */
+  'update.available': 'Version {version} is available',
+  'update.installed': 'You have {version}.',
+  'update.install': 'Install it',
+  'update.dismiss': 'Not now',
+
 };
 
 export default en;

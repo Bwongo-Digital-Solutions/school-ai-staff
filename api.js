@@ -327,6 +327,11 @@ export const receiptUrl = ({ paymentId, requesterRole }) =>
 export const schoolApi = {
   health: () => get('/api/health'),
 
+  /* What the school is handing out, and which version is newest. Public — the sign-in page uses
+     it to draw its install QR codes before anybody has signed in, and the update check below
+     needs no session either. */
+  appOffer: () => get('/api/app/staff').then((d) => (d && d.data) || null),
+
   /* The school's own name, tagline and logo, set by an admin in the web app under
      Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
      so the sign-in screen can brand itself before anyone has signed in. */
