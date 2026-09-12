@@ -11,9 +11,10 @@
    of shareFile() returning — see how ReportScreen words it. */
 
 import * as FileSystem from 'expo-file-system';
+import * as Printing from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { ApiError } from './api';
+import { api, ApiError } from './api';
 
 /* Cache rather than documents: these are copies of something the server can rebuild at any
    time, and the OS may clear them whenever it needs the space. */
@@ -31,14 +32,24 @@ async function ensureDirectory() {
  *
  * The PDF routes answer errors as JSON with a normal status code, so a 403 or a 404 arrives
  * as a small file rather than a failed download — the status is checked rather than trusted.
+ *
+ * The session travels as a bearer token and has to be attached by hand. This app holds no cookie
+ * jar — that is why it asks the server for a token at sign-in — and `downloadAsync` builds its own
+ * request rather than going through the wrapper in api.js that would otherwise add the header. So
+ * without this, every document route answered 403 and the app reported, accurately and uselessly,
+ * that the user was not allowed to open their own school's documents.
  */
 export async function downloadDocument(url, filename) {
   const dir = await ensureDirectory();
   const target = `${dir}${filename}`;
 
+  const token = api.token();
+
   let result;
   try {
-    result = await FileSystem.downloadAsync(url, target);
+    result = await FileSystem.downloadAsync(url, target, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
   } catch {
     throw new ApiError('Cannot reach the server to fetch that document.', 0);
   }
@@ -72,4 +83,27 @@ export async function shareDocument(url, filename, { title } = {}) {
   return uri;
 }
 
-export default { downloadDocument, shareFile, shareDocument };
+/**
+ * Opens Android's own print dialog on a downloaded file.
+ *
+ * Distinct from sharing, which is what the app could already do. The share sheet can reach a print
+ * app if one is installed, but it is a list of apps rather than a print dialog — the dialog lists
+ * whatever printers the phone is set up for and offers Save as PDF besides, which is what somebody
+ * asking to print a class set expects to see.
+ *
+ * Like the share sheet, the dialog belongs to the operating system: it does not tell the app
+ * whether anything was printed, or on which printer. So nothing here claims a document was printed,
+ * only that the dialog was opened.
+ */
+export async function printFile(uri) {
+  await Printing.printAsync({ uri });
+}
+
+/** Download, then print. */
+export async function printDocument(url, filename) {
+  const uri = await downloadDocument(url, filename);
+  await printFile(uri);
+  return uri;
+}
+
+export default { downloadDocument, shareFile, shareDocument, printFile, printDocument };

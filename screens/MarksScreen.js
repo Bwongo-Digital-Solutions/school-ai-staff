@@ -19,6 +19,7 @@ import {
   Platform,
   TextInput,
   Pressable,
+  Linking,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
@@ -268,11 +269,24 @@ export default function MarksScreen({ user, onBack }) {
                         Photograph a mark sheet and the marks are read off it. You check them before
                         anything is saved.
                       </Text>
+                      {/* Asking again after Android has been told not to resolves silently, so the
+                          button would sit there doing nothing. Once that has happened the device's
+                          settings screen is the only way through. */}
                       <Button
-                        label={permission?.granted ? 'Open the camera' : 'Allow the camera'}
+                        label={
+                          permission?.granted
+                            ? 'Open the camera'
+                            : permission && !permission.canAskAgain
+                              ? 'Open settings'
+                              : 'Allow the camera'
+                        }
                         icon={Camera}
                         variant="secondary"
-                        onPress={() => (permission?.granted ? setCamera(true) : requestPermission())}
+                        onPress={() => {
+                          if (permission?.granted) setCamera(true);
+                          else if (permission && !permission.canAskAgain) Linking.openSettings();
+                          else requestPermission();
+                        }}
                       />
                     </View>
                   ) : null}

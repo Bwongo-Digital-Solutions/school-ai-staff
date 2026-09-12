@@ -24,6 +24,9 @@ import ScannerScreen from './screens/ScannerScreen';
 import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
+import PrintClassScreen from './screens/PrintClassScreen';
+import UpdateBanner from './components/UpdateBanner';
+import { checkForUpdate, dismissUpdate } from './update';
 import PendingGateScreen from './screens/PendingGateScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
 import MatronScreen from './screens/MatronScreen';
@@ -95,11 +98,31 @@ function Root() {
   const [recent, setRecent] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  /* A newer build, when there is one. Null covers every uninteresting case — up to date, nothing
+     published, a server that cannot be reached — so there is one thing to render on. */
+  const [update, setUpdate] = useState(null);
+  /* Asked at most every few hours. The server caches its own answer for an hour and a release
+     happens a few times a term, so foregrounding the app twenty times in a morning is one
+     request. */
+  const updateCheckedAt = useRef(0);
+
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState([]);
   /* The hardware back handler needs the depth synchronously, before React has
      applied the queued state, so the stack is mirrored in a ref. */
   const stackRef = useRef([]);
+
+  /* Six hours, not every foregrounding: the server caches its own answer for an hour and a release
+     happens a few times a term, so a teacher opening the app twenty times in a morning costs one
+     request. `checkForUpdate` answers null for everything uninteresting, so this either has
+     something worth saying or it has nothing. */
+  const UPDATE_CHECK_FLOOR_MS = 6 * 60 * 60 * 1000;
+
+  const lookForUpdate = useCallback(async () => {
+    if (Date.now() - updateCheckedAt.current < UPDATE_CHECK_FLOOR_MS) return;
+    updateCheckedAt.current = Date.now();
+    setUpdate(await checkForUpdate());
+  }, []);
 
   const [school, setSchool] = useState({ students: [], fees: [] });
   const [loading, setLoading] = useState(false);
@@ -400,11 +423,15 @@ function Root() {
 
     /* 'unknown' is what some devices report before the first change event; only a
        genuinely backgrounded app should sit idle. */
-    if (AppState.currentState !== 'background') start();
+    if (AppState.currentState !== 'background') {
+      lookForUpdate();
+      start();
+    }
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         refreshInbox();
         refreshPendingGate();
+        lookForUpdate();
         start();
       } else {
         stop();
@@ -415,7 +442,7 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox, refreshPendingGate]);
+  }, [user, refreshInbox, refreshPendingGate, lookForUpdate]);
 
   useNewMessageChime(inbox);
 
@@ -449,9 +476,25 @@ function Root() {
      roster screens never flash an empty state before the first request. */
   const pending = hasRoster(user) && (loading || (!loadedRef.current && !error));
 
+  const updateBanner = update ? (
+    <UpdateBanner
+      update={update}
+      onDismiss={() => {
+        /* Remembered against the version, not as a flag: waving away 1.2.0 must not silence
+           1.3.0 as well. */
+        void dismissUpdate(update.version);
+        setUpdate(null);
+      }}
+    />
+  ) : null;
+
   return (
     <View style={styles.root}>
       {statusBar}
+      {/* Above the screen rather than inside one, so it is seen wherever the teacher happens to
+          be — and outside the tab content, so no screen has to know it exists. It sits at the
+          root of the stack only: it must not cover a scan in progress or a form half filled in. */}
+      {atRoot ? updateBanner : null}
       <View style={styles.flex}>
         {route.name === 'home' && (
           <HomeScreen
@@ -495,8 +538,17 @@ function Root() {
             error={error}
             onRetry={retry}
             onOpenStudent={openStudent}
+            /* A class set is marks and money for thirty families at once, so the button is only
+               drawn for the roles the server would let through anyway. */
+            onPrintClass={
+              ['admin', 'teacher'].includes((user && user.role) || '')
+                ? () => push({ name: 'printClass' })
+                : undefined
+            }
           />
         )}
+
+        {route.name === 'printClass' && <PrintClassScreen user={user} onBack={pop} />}
 
         {route.name === 'assistant' && (
           <AssistantScreen

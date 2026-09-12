@@ -297,12 +297,40 @@ export const reportUrl = ({ code, sections, requesterRole, actorName }) =>
     actorName,
   });
 
+/**
+ * One student's report card — the term's marks, as the parent receives them.
+ *
+ * Distinct from `reportUrl` above, which is the whole record: marks, attendance, fees and details
+ * together. A teacher at the end of term usually wants the card; a teacher asked a question about
+ * a child usually wants the record.
+ */
+export const reportCardUrl = ({ code, term, requesterRole }) =>
+  documentUrl(`/api/report-cards/${encodeURIComponent(code)}.pdf`, { term, requesterRole });
+
+/** A whole class's report cards, as one file. Naming no stream means every stream in the class. */
+export const classReportCardsUrl = ({ grade, section, term, requesterRole }) =>
+  documentUrl('/api/report-cards.pdf', { grade, section, term, requesterRole });
+
+/** A whole class's records, as one file. `sections` picks which parts of the record to include. */
+export const classReportsUrl = ({ grade, section, sections, requesterRole }) =>
+  documentUrl('/api/student-reports.pdf', {
+    grade,
+    section,
+    sections: Array.isArray(sections) ? sections.join(',') : sections,
+    requesterRole,
+  });
+
 /** The receipt already issued for one payment. Keyed by the payment, not the receipt. */
 export const receiptUrl = ({ paymentId, requesterRole }) =>
   documentUrl(`/api/fees/receipts/${encodeURIComponent(paymentId)}.pdf`, { requesterRole });
 
 export const schoolApi = {
   health: () => get('/api/health'),
+
+  /* What the school is handing out, and which version is newest. Public — the sign-in page uses
+     it to draw its install QR codes before anybody has signed in, and the update check below
+     needs no session either. */
+  appOffer: () => get('/api/app/staff').then((d) => (d && d.data) || null),
 
   /* The school's own name, tagline and logo, set by an admin in the web app under
      Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
