@@ -17,7 +17,9 @@ import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, todayIso } from '../format';
-import { canRegisterStudents, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey } from '../roles';
+import {
+  canRegisterStudents, featureOn, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey,
+} from '../roles';
 import { useT } from '../i18n';
 import { GATE_ACTIONS } from './GateConfirmScreen';
 import Card from '../components/Card';
@@ -49,6 +51,7 @@ function summarise(students, fees, roster) {
 
 export default function HomeScreen({
   user,
+  features,
   students,
   fees,
   recent,
@@ -149,13 +152,15 @@ export default function HomeScreen({
                 <>
                   {/* The matron's evening, rather than the fee status every other support post
                       lands on. She has a roll to call and a sick bay to keep. */}
-                  <Button
-                    label="Dormitories"
-                    icon={Bed}
-                    variant="secondary"
-                    onPress={onOpenMatron}
-                    style={styles.rollCallButton}
-                  />
+                  {featureOn(features, 'matron') ? (
+                    <Button
+                      label={t('home.dormitories')}
+                      icon={Bed}
+                      variant="secondary"
+                      onPress={onOpenMatron}
+                      style={styles.rollCallButton}
+                    />
+                  ) : null}
                   <StateBlock message={t(scanPurposeKey(user))} style={styles.supportHint} />
                 </>
               ) : isAskari(user) ? (
@@ -179,28 +184,32 @@ export default function HomeScreen({
               <>
                 {/* Calling the register is a daily job for a class teacher, so it gets its
                     own way in rather than being reachable only by scanning somebody. */}
-                <Button
-                  label="Call the register"
-                  icon={ListChecks}
-                  variant="secondary"
-                  onPress={onOpenRollCall}
-                  style={styles.rollCallButton}
-                />
+                {featureOn(features, 'attendance') ? (
+                  <Button
+                    label={t('home.callRegister')}
+                    icon={ListChecks}
+                    variant="secondary"
+                    onPress={onOpenRollCall}
+                    style={styles.rollCallButton}
+                  />
+                ) : null}
 
                 {/* Marks are entered against a class the teacher is assigned to, so the screen
                     is offered to anyone teaching and tells them if they have none. */}
-                <Button
-                  label="Record marks"
-                  icon={Exam}
-                  variant="secondary"
-                  onPress={onRecordMarks}
-                  style={styles.rollCallButton}
-                />
+                {featureOn(features, 'marks') ? (
+                  <Button
+                    label={t('home.recordMarks')}
+                    icon={Exam}
+                    variant="secondary"
+                    onPress={onRecordMarks}
+                    style={styles.rollCallButton}
+                  />
+                ) : null}
 
                 {/* Enrolling is the office's job, so only they are offered it. */}
-                {canRegisterStudents(user) ? (
+                {canRegisterStudents(user) && featureOn(features, 'registration') ? (
                   <Button
-                    label="Register a student"
+                    label={t('home.registerStudent')}
                     icon={UserPlus}
                     variant="secondary"
                     onPress={onRegisterStudent}
@@ -208,7 +217,7 @@ export default function HomeScreen({
                   />
                 ) : null}
 
-                <SectionLabel>Recent students</SectionLabel>
+                <SectionLabel>{t('home.recentStudents')}</SectionLabel>
                 {recentStudents.length ? (
                   <Card style={styles.listCard}>
                     {recentStudents.map((student, index) => (

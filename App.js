@@ -12,7 +12,7 @@ import {
 import { ThemeProvider, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError } from './api';
-import { allowedTabs, hasRoster, isAskari } from './roles';
+import { allowedTabs, featureOn, hasRoster, isAskari } from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
@@ -101,6 +101,9 @@ function Root() {
   /* A newer build, when there is one. Null covers every uninteresting case — up to date, nothing
      published, a server that cannot be reached — so there is one thing to render on. */
   const [update, setUpdate] = useState(null);
+  /* What this school has, and what it has switched off. Null until the server has answered, which
+     every reader treats as "everything on" — see `featureOn` in roles.js for why that direction. */
+  const [features, setFeatures] = useState(null);
   /* Asked at most every few hours. The server caches its own answer for an hour and a release
      happens a few times a term, so foregrounding the app twenty times in a morning is one
      request. */
@@ -122,6 +125,22 @@ function Root() {
     if (Date.now() - updateCheckedAt.current < UPDATE_CHECK_FLOOR_MS) return;
     updateCheckedAt.current = Date.now();
     setUpdate(await checkForUpdate());
+  }, []);
+
+  /* Which features this school is using. Read alongside the update check rather than on its own
+     schedule: both are "what has changed about this school since I last looked", both are cheap, and
+     an administrator switching something off is no more urgent to a phone than a new release.
+
+     A failure leaves the previous answer standing, and the first failure leaves it null — which means
+     everything on. The server refuses what is off regardless, so the cost of being wrong here is one
+     clear refusal rather than an app with no tabs. */
+  const lookForFeatures = useCallback(async () => {
+    try {
+      const answer = await schoolApi.entitlements();
+      if (answer && answer.features) setFeatures(answer.features);
+    } catch {
+      // Offline, or a server mid-restart. The teacher did not ask, so there is nothing to report.
+    }
   }, []);
 
   const [school, setSchool] = useState({ students: [], fees: [] });
@@ -241,12 +260,12 @@ function Root() {
 
   const goToTab = useCallback(
     (next) => {
-      const target = allowedTabs(user).includes(next) ? next : 'home';
+      const target = allowedTabs(user, features).includes(next) ? next : 'home';
       stackRef.current = [];
       setStack([]);
       setTab(target);
     },
-    [user],
+    [user, features],
   );
 
   const push = useCallback((route) => {
@@ -396,6 +415,19 @@ function Root() {
     if (user && atHome) refreshInbox();
   }, [user, atHome, refreshInbox]);
 
+  /* Somebody left on a tab that has just been switched off.
+   *
+   * The tab bar stops offering it, but that alone leaves whoever was already standing on it looking
+   * at the screen — a teacher with the assistant open when an administrator switches it off keeps it
+   * until they happen to tap elsewhere. The server refuses every request behind it by then, so what
+   * they are looking at is a screen that has stopped working without saying so. This moves them home
+   * instead. Runs when the switches change rather than on every render, so it never fights a tap.
+   */
+  useEffect(() => {
+    if (!user) return;
+    if (!allowedTabs(user, features).includes(tab)) setTab('home');
+  }, [user, features, tab]);
+
   /* Also refreshed on every return to the root, so a decision made on the gate list is
      reflected the moment the officer comes back from it. */
   useEffect(() => {
@@ -425,6 +457,7 @@ function Root() {
        genuinely backgrounded app should sit idle. */
     if (AppState.currentState !== 'background') {
       lookForUpdate();
+      lookForFeatures();
       start();
     }
     const sub = AppState.addEventListener('change', (state) => {
@@ -432,6 +465,7 @@ function Root() {
         refreshInbox();
         refreshPendingGate();
         lookForUpdate();
+        lookForFeatures();
         start();
       } else {
         stop();
@@ -442,7 +476,7 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox, refreshPendingGate, lookForUpdate]);
+  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures]);
 
   useNewMessageChime(inbox);
 
@@ -499,6 +533,7 @@ function Root() {
         {route.name === 'home' && (
           <HomeScreen
             user={user}
+            features={features}
             students={school.students}
             fees={school.fees}
             recent={recent}
@@ -654,7 +689,7 @@ function Root() {
         )}
       </View>
 
-      {atRoot ? <TabBar active={tab} user={user} onSelect={goToTab} /> : null}
+      {atRoot ? <TabBar active={tab} user={user} features={features} onSelect={goToTab} /> : null}
 
       <SettingsSheet
         visible={settingsOpen}
