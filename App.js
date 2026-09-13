@@ -143,6 +143,27 @@ function Root() {
     }
   }, []);
 
+  /**
+   * The school's own figures, for the band at the top of Home.
+   *
+   * Null until the server answers, and null again if it refuses — the band simply is not drawn. That
+   * is deliberate and not laziness: these totals are the school's roll, its money and its register,
+   * and the honest thing to show when they cannot be fetched is nothing. A stale or locally guessed
+   * figure looks exactly like a real one.
+   *
+   * Nothing else on Home depends on it. The scan button, the actions and the recent students are all
+   * still there on a phone that cannot reach this endpoint.
+   */
+  const [overview, setOverview] = useState(null);
+
+  const lookForOverview = useCallback(async () => {
+    try {
+      setOverview(await schoolApi.dashboard());
+    } catch {
+      // Same as above: the teacher did not ask for this, so a failure is not worth a message.
+    }
+  }, []);
+
   const [school, setSchool] = useState({ students: [], fees: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -376,6 +397,7 @@ function Root() {
     setStack([]);
     setTab('home');
     setSchool({ students: [], fees: [] });
+    setOverview(null);
     setError('');
     setInbox(EMPTY_INBOX);
     setPendingGate(EMPTY_PENDING_GATE);
@@ -458,6 +480,7 @@ function Root() {
     if (AppState.currentState !== 'background') {
       lookForUpdate();
       lookForFeatures();
+      lookForOverview();
       start();
     }
     const sub = AppState.addEventListener('change', (state) => {
@@ -466,6 +489,7 @@ function Root() {
         refreshPendingGate();
         lookForUpdate();
         lookForFeatures();
+        lookForOverview();
         start();
       } else {
         stop();
@@ -476,7 +500,7 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures]);
+  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures, lookForOverview]);
 
   useNewMessageChime(inbox);
 
@@ -534,8 +558,8 @@ function Root() {
           <HomeScreen
             user={user}
             features={features}
+            overview={overview}
             students={school.students}
-            fees={school.fees}
             recent={recent}
             loading={pending}
             error={error}

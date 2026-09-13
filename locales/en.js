@@ -204,6 +204,11 @@ export const en = {
   'update.dismiss': 'Not now',
 
   /* ── the home screen's own actions ────────────────────────── */
+  'home.overview': 'School overview',
+  'home.students': 'Students',
+  'home.attendanceToday': "Attendance today",
+  'home.feesOwing': 'Fees owing',
+  'home.passRate': 'Pass rate',
   'home.dormitories': 'Dormitories',
   'home.callRegister': 'Call the register',
   'home.recordMarks': 'Record marks',

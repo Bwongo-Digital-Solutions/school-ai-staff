@@ -118,7 +118,20 @@ const decimal = (text) => (locale === 'fr' ? String(text).replace('.', ',') : St
 
 export const gpaOf = (s) => decimal(Number((s && s.gpa) || 0).toFixed(2));
 
-/* French typography puts a narrow no-break space before the per-cent sign. */
+/**
+ * A percentage off the server, or a dash.
+ *
+ * `null` means "no denominator yet" — a school that has called no register has no attendance rate,
+ * which is a different fact from 0%, and showing a zero there would read as nobody turning up.
+ */
+export const percent = (value, decimals = 0) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  const text = decimal(Number(value).toFixed(decimals));
+  return locale === 'fr' ? `${text}${NBSP}%` : `${text}%`;
+};
+
+/* French typography puts a no-break space before the per-cent sign. U+00A0, never U+202F: the
+   narrow one cannot be encoded in WinAnsi and throws when a PDF is drawn. */
 export const attendanceOf = (s) => {
   const value = Number((s && s.attendance_rate) || 0).toFixed(0);
   return locale === 'fr' ? `${value}${NBSP}%` : `${value}%`;
