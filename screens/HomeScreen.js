@@ -16,7 +16,7 @@ import {
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
-import { amount, todayIso } from '../format';
+import { amount, money, percent, todayIso } from '../format';
 import {
   canRegisterStudents, featureOn, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey,
 } from '../roles';
@@ -34,26 +34,65 @@ import CountsRow from '../components/CountsRow';
 import AnimatedBell from '../components/AnimatedBell';
 import MovementList from '../components/MovementList';
 
-function summarise(students, fees, roster) {
-  if (!roster) return { students: '', gpa: '', attendance: '', owing: '' };
-  if (!students.length) return { students: 0, gpa: '—', attendance: '—', owing: '—' };
-  const gpa = students.reduce((a, s) => a + Number(s.gpa || 0), 0) / students.length;
-  const attendance =
-    students.reduce((a, s) => a + Number(s.attendance_rate || 0), 0) / students.length;
-  const owing = fees.reduce((a, f) => a + Number(f.balance_due || 0), 0);
-  return {
-    students: students.length,
-    gpa: gpa ? gpa.toFixed(2) : '—',
-    attendance: attendance ? `${attendance.toFixed(0)}%` : '—',
-    owing: fees.length ? amount(owing) : '—',
-  };
+/**
+ * The overview band, built from what the server sent.
+ *
+ * This used to be computed here, from whatever roster and fee rows the app had loaded: students as
+ * `students.length`, attendance as an unweighted mean of per-student rates, fees owing as a sum over
+ * the rows in hand. Every one of those is a second opinion — the web dashboard asks the server the
+ * same questions and gets different numbers, and a head teacher comparing their phone to their
+ * laptop has no way to tell which is lying.
+ *
+ * So the figures come from `/api/functions/dashboard` now, the same endpoint the web dashboard reads.
+ * The server sends only the sections this reader may see, which is why each tile is conditional: a
+ * teacher's answer carries no `fees`, so there is no fees tile, and no decision to make here about
+ * who sees the money.
+ */
+function overviewTiles(overview, t) {
+  if (!overview) return [];
+  const tiles = [];
+  if (overview.students) {
+    tiles.push({
+      key: 'students',
+      icon: UsersThree,
+      label: t('home.students'),
+      value: amount(overview.students.active),
+      variant: 'gradient',
+    });
+  }
+  if (overview.attendance) {
+    tiles.push({
+      key: 'attendance',
+      icon: CalendarCheck,
+      label: t('home.attendanceToday'),
+      value: percent(overview.attendance.today.rate),
+      variant: 'gradient',
+    });
+  }
+  if (overview.fees) {
+    tiles.push({
+      key: 'fees',
+      icon: Coins,
+      label: t('home.feesOwing'),
+      value: money(overview.fees.outstanding, overview.fees.currency),
+    });
+  }
+  if (overview.performance) {
+    tiles.push({
+      key: 'performance',
+      icon: ChartLineUp,
+      label: t('home.passRate'),
+      value: percent(overview.performance.passRate),
+    });
+  }
+  return tiles;
 }
 
 export default function HomeScreen({
   user,
   features,
+  overview,
   students,
-  fees,
   recent,
   loading,
   error,
@@ -78,7 +117,7 @@ export default function HomeScreen({
 
   const roster = hasRoster(user);
   const gateKeeper = isAskari(user);
-  const totals = useMemo(() => summarise(students, fees, roster), [students, fees, roster]);
+  const tiles = useMemo(() => overviewTiles(overview, t), [overview, t]);
   const recentStudents = useMemo(
     () => recent.map((id) => students.find((s) => s.id === id)).filter(Boolean),
     [recent, students],
@@ -129,23 +168,25 @@ export default function HomeScreen({
           <StateBlock kind="error" message={error} onRetry={onRetry} />
         ) : (
           <>
-            <SectionLabel style={styles.firstLabel}>School overview</SectionLabel>
-            <View style={styles.statGrid}>
-              <StatTile
-                icon={UsersThree}
-                label="Students"
-                value={String(totals.students)}
-                variant="gradient"
-              />
-              <StatTile
-                icon={ChartLineUp}
-                label="Average GPA"
-                value={totals.gpa}
-                variant="gradient"
-              />
-              <StatTile icon={CalendarCheck} label="Attendance" value={totals.attendance} />
-              <StatTile icon={Coins} label="Fees owing" value={totals.owing} />
-            </View>
+            {/* Drawn only once the server has answered. A band that cannot be fetched is not
+                drawn at all — better an absent figure than a guessed one, and everything else on
+                this screen works without it. */}
+            {tiles.length ? (
+              <>
+                <SectionLabel style={styles.firstLabel}>{t('home.overview')}</SectionLabel>
+                <View style={styles.statGrid}>
+                  {tiles.map((tile) => (
+                    <StatTile
+                      key={tile.key}
+                      icon={tile.icon}
+                      label={tile.label}
+                      value={tile.value}
+                      variant={tile.variant}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
 
             {!roster ? (
               isMatron(user) ? (

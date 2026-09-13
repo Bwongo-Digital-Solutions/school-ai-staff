@@ -346,6 +346,20 @@ export const schoolApi = {
    */
   entitlements: () => get('/api/entitlements').then((d) => (d && d.data) || null),
 
+  /**
+   * The school in figures, cut to whoever is asking.
+   *
+   * The server sends only the sections this reader may see — a teacher's answer has no `fees` key at
+   * all, so the phone is never holding a total it is choosing not to draw. The same endpoint the web
+   * app's dashboard reads, which is the point: one definition of "how many students", not one per
+   * client.
+   *
+   * Signed in only, and every section behind both a role and a feature switch, so a school that has
+   * switched off marks loses the performance figure here exactly as it loses the rail entry there.
+   */
+  dashboard: () =>
+    post('/api/functions/dashboard', { action: 'summary' }).then((d) => (d && d.data) || null),
+
   /* The school's own name, tagline and logo, set by an admin in the web app under
      Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
      so the sign-in screen can brand itself before anyone has signed in. */

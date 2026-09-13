@@ -219,6 +219,11 @@ export const fr = {
   'update.dismiss': 'Pas maintenant',
 
   /* ── les actions de l'accueil ─────────────────────────────── */
+  'home.overview': "Aperçu de l'école",
+  'home.students': 'Élèves',
+  'home.attendanceToday': "Présence aujourd'hui",
+  'home.feesOwing': 'Frais impayés',
+  'home.passRate': 'Taux de réussite',
   'home.dormitories': 'Dortoirs',
   'home.callRegister': "Faire l'appel",
   'home.recordMarks': 'Saisir les notes',
