@@ -203,6 +203,13 @@ export const en = {
   'update.install': 'Install it',
   'update.dismiss': 'Not now',
 
+  /* ── the home screen's own actions ────────────────────────── */
+  'home.dormitories': 'Dormitories',
+  'home.callRegister': 'Call the register',
+  'home.recordMarks': 'Record marks',
+  'home.registerStudent': 'Register a student',
+  'home.recentStudents': 'Recent students',
+
 };
 
 export default en;

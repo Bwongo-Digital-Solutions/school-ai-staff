@@ -14,14 +14,18 @@ const TABS = [
   { key: 'profile', label: 'tab.profile', icon: UserCircle },
 ];
 
-export default function TabBar({ active, user, onSelect }) {
+export default function TabBar({ active, user, features, onSelect }) {
   const { t } = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  /* `features` as well as the role, because a school can switch off what a role is allowed to do —
+     a school with no assistant should not show the tab to the teachers who would otherwise have it.
+     Decided in `allowedTabs` rather than here, so the tab bar and the router that guards a tab
+     cannot disagree about which tabs exist. */
   const visible = useMemo(() => {
-    const allowed = allowedTabs(user);
+    const allowed = allowedTabs(user, features);
     return TABS.filter((tab) => allowed.includes(tab.key));
-  }, [user]);
+  }, [user, features]);
 
   return (
     <View style={styles.bar}>

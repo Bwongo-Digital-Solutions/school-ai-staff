@@ -218,6 +218,13 @@ export const fr = {
   'update.install': "L'installer",
   'update.dismiss': 'Pas maintenant',
 
+  /* ── les actions de l'accueil ─────────────────────────────── */
+  'home.dormitories': 'Dortoirs',
+  'home.callRegister': "Faire l'appel",
+  'home.recordMarks': 'Saisir les notes',
+  'home.registerStudent': 'Inscrire un élève',
+  'home.recentStudents': 'Élèves récents',
+
 };
 
 export default fr;

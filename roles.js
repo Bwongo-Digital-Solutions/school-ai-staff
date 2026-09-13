@@ -83,8 +83,48 @@ const ROSTER_ROLES = ['admin', 'head_teacher', 'teacher'];
 
 export const hasRoster = (user) => !!user && ROSTER_ROLES.includes(user.role);
 
-export const allowedTabs = (user) =>
-  (hasRoster(user) ? TABS : TABS.filter((t) => t !== 'students' && t !== 'assistant'));
+/**
+ * Which feature each tab belongs to, mirroring the registry in server/licensing/plans.mjs.
+ *
+ * `home` and `profile` are absent on purpose, and not by oversight. Home is where a teacher lands and
+ * Profile is where they sign out — a school that switched either off would have an app that could not
+ * be used or left, and neither is a capability anybody buys. The same reasoning the server uses for
+ * leaving signing in ungated.
+ */
+const TAB_FEATURE = {
+  scan: 'scanning',
+  students: 'students',
+  assistant: 'assistant',
+};
+
+/**
+ * Whether a feature is on, given what the server said.
+ *
+ * Unknown resolves to **on**, in every direction: no answer yet, a failed request, a feature this
+ * build knows about and that server does not. The server refuses what is off whatever this thinks, so
+ * an optimistic answer costs one clear refusal; a pessimistic one hands a teacher an app with no tabs
+ * because a request timed out at the gate.
+ */
+export const featureOn = (features, key) => {
+  if (!key || !features) return true;
+  const found = features[key];
+  return found ? found.allowed !== false : true;
+};
+
+/**
+ * The tabs this person gets.
+ *
+ * Two fences, and they are asked in this order because they answer different questions. The role
+ * decides what this person may do; the switches decide what this school does at all. A bursar does
+ * not get the roster because of the first, and nobody gets the assistant if the school switched it
+ * off because of the second.
+ *
+ * `features` is the `features` map from /api/entitlements, or null before it has been read.
+ */
+export const allowedTabs = (user, features = null) => {
+  const byRole = hasRoster(user) ? TABS : TABS.filter((t) => t !== 'students' && t !== 'assistant');
+  return byRole.filter((tab) => featureOn(features, TAB_FEATURE[tab]));
+};
 
 /* The six roles the server recognises (server/auth/roles.mjs). The three that were missing here
    rendered as a raw role string — "head_teacher" — on every screen that shows a job title. */

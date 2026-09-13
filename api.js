@@ -332,6 +332,20 @@ export const schoolApi = {
      needs no session either. */
   appOffer: () => get('/api/app/staff').then((d) => (d && d.data) || null),
 
+  /**
+   * What this school has, and what it has switched off.
+   *
+   * Two axes in one answer. The plan is what somebody sold the school; the switches are what the
+   * school chose to use out of that — an administrator turns the assistant or the dormitories off in
+   * the web app, and this is how the phone finds out so it stops offering a tab whose every request
+   * would be refused.
+   *
+   * Open to any caller, like the offer above, because a client has to draw a tab bar before it knows
+   * what to ask for. It leaks a tier and a list of feature names, which is what the web app's own
+   * navigation already reveals to anyone who loads it.
+   */
+  entitlements: () => get('/api/entitlements').then((d) => (d && d.data) || null),
+
   /* The school's own name, tagline and logo, set by an admin in the web app under
      Settings -> Branding. Reads are open to any caller — only `update` is admin-gated —
      so the sign-in screen can brand itself before anyone has signed in. */
