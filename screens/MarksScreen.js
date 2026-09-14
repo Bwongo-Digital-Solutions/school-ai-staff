@@ -25,27 +25,32 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import {
-  Camera, FileArrowUp, FloppyDisk, Keyboard, WarningCircle, X,
+  Camera, FileArrowUp, FloppyDisk, Keyboard, Printer, WarningCircle, X,
 } from 'phosphor-react-native';
 import { useTheme, spacing, fonts, type } from '../theme';
-import { schoolApi, ApiError } from '../api';
+import { schoolApi, broadsheetUrl, ApiError } from '../api';
+import { printDocument } from '../share';
+import { canPrintDocuments } from '../roles';
 import Button from '../components/Button';
 import Select from '../components/Select';
 import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
 import { FormError } from '../components/Field';
 import { alertSuccess, alertError } from '../alerts';
+import { useT } from '../i18n';
+import { classOf } from '../format';
 
 const MODES = [
-  { key: 'type', label: 'Type', icon: Keyboard },
-  { key: 'photo', label: 'Photograph', icon: Camera },
-  { key: 'file', label: 'File', icon: FileArrowUp },
+  { key: 'type', label: 'marks.modeType', icon: Keyboard },
+  { key: 'photo', label: 'marks.modePhoto', icon: Camera },
+  { key: 'file', label: 'marks.modeFile', icon: FileArrowUp },
 ];
 
 const classKey = (row) => `${row.grade_level}|${row.class_section}|${row.subject_id}`;
 
 export default function MarksScreen({ user, onBack }) {
   const { colors } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [mode, setMode] = useState('type');
@@ -117,9 +122,9 @@ export default function MarksScreen({ user, onBack }) {
       setProposal(res);
       if (res && res.note) setError(res.note);
     } catch (err) {
-      const detail = err instanceof ApiError ? err.message : 'That file could not be read.';
+      const detail = err instanceof ApiError ? err.message : t('marks.fileUnreadable');
       setError(detail);
-      alertError('Not read', detail);
+      alertError(t('marks.notRead'), detail);
     } finally {
       setBusy('');
     }
@@ -133,7 +138,7 @@ export default function MarksScreen({ user, onBack }) {
       await sendForReading({ uri: shot.uri, filename: 'marksheet.jpg', mimeType: 'image/jpeg' });
     } catch {
       setCamera(false);
-      setError('The camera could not take that picture.');
+      setError(t('marks.cameraFailed'));
     }
   };
 
@@ -151,7 +156,7 @@ export default function MarksScreen({ user, onBack }) {
       const asset = picked.assets[0];
       await sendForReading({ uri: asset.uri, filename: asset.name, mimeType: asset.mimeType });
     } catch {
-      setError('That file could not be opened.');
+      setError(t('marks.fileUnopenable'));
     }
   };
 
@@ -169,7 +174,7 @@ export default function MarksScreen({ user, onBack }) {
 
   const save = async () => {
     if (!pending.length) {
-      setError('There are no marks to save yet.');
+      setError(t('marks.nothingToSave'));
       return;
     }
     setBusy('saving');
@@ -184,15 +189,44 @@ export default function MarksScreen({ user, onBack }) {
       });
       // Reported only once the server says how many rows it wrote.
       if (!res || typeof res.saved !== 'number') {
-        throw new ApiError('The server did not confirm the marks. Nothing was saved.', 0);
+        throw new ApiError(t('marks.unconfirmed'), 0);
       }
-      alertSuccess('Marks saved', `${res.saved} recorded for ${selected.subject_name}`);
+      alertSuccess(
+        t('marks.saved'),
+        t('marks.savedCount', { count: res.saved, subject: selected.subject_name }),
+      );
       setProposal(null);
       await loadRoster(selected);
     } catch (err) {
-      const detail = err instanceof ApiError ? err.message : 'Those marks were not saved.';
+      const detail = err instanceof ApiError ? err.message : t('marks.saveFailed');
       setError(detail);
-      alertError('Not saved', detail);
+      alertError(t('marks.notSaved'), detail);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  /* Printing the sheet a teacher has just filled in, without asking them which class again — they
+     are looking at it. The whole stream goes on the table, every subject, not only the one they
+     entered: what a teacher wants after entering marks is the class's standing, and a table with a
+     single column is a list they already have above. */
+  const printClassMarks = async () => {
+    if (!selected) return;
+    setBusy('printing');
+    setError('');
+    try {
+      await printDocument(
+        broadsheetUrl({
+          grade: selected.grade_level,
+          section: selected.class_section,
+          requesterRole: (user && user.role) || '',
+        }),
+        `broadsheet-grade-${selected.grade_level}-${selected.class_section || ''}.pdf`,
+      );
+    } catch (err) {
+      const detail = err instanceof ApiError ? err.message : t('marks.printFailed');
+      setError(detail);
+      alertError(t('marks.notPrinted'), detail);
     } finally {
       setBusy('');
     }
@@ -201,15 +235,15 @@ export default function MarksScreen({ user, onBack }) {
   if (camera) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="Photograph the sheet" onBack={() => setCamera(false)} />
+        <ScreenHeader title={t('marks.photographTitle')} onBack={() => setCamera(false)} />
         <View style={styles.cameraWrap}>
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         </View>
         <View style={styles.cameraBar}>
           <Text style={styles.hint}>
-            Fill the frame with the sheet. Names on the left, marks on the right.
+            {t('marks.framingHint')}
           </Text>
-          <Button label="Take the picture" icon={Camera} variant="primary" onPress={takePhoto} />
+          <Button label={t('marks.takePicture')} icon={Camera} variant="primary" onPress={takePhoto} />
         </View>
       </SafeAreaView>
     );
@@ -219,27 +253,30 @@ export default function MarksScreen({ user, onBack }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="Record marks" onBack={onBack} />
+      <ScreenHeader title={t('marks.title')} onBack={onBack} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {classes === null ? (
-            <StateBlock kind="loading" message="Loading your classes…" />
+            <StateBlock kind="loading" message={t('marks.loadingClasses')} />
           ) : classes.length === 0 ? (
-            <StateBlock message="You have no classes assigned yet. An administrator gives you one on the web app under Users — open your name and choose Classes — and it appears here." />
+            <StateBlock message={t('marks.noClasses')} />
           ) : (
             <>
               <Select
-                label="Class and subject"
+                label={t('marks.classAndSubject')}
                 value={chosen}
                 onChange={setChosen}
                 options={classes.map((row) => ({
                   value: classKey(row),
-                  label: `Grade ${row.grade_level}${row.class_section} · ${row.subject_name}`,
+                  label: t('marks.classOption', {
+                    class: classOf(row),
+                    subject: row.subject_name,
+                  }),
                 }))}
-                placeholder="Choose a class…"
+                placeholder={t('marks.chooseClass')}
               />
 
               {selected ? (
@@ -257,7 +294,7 @@ export default function MarksScreen({ user, onBack }) {
                           weight={mode === option.key ? 'fill' : 'regular'}
                         />
                         <Text style={[styles.modeLabel, mode === option.key && styles.modeLabelOn]}>
-                          {option.label}
+                          {t(option.label)}
                         </Text>
                       </Pressable>
                     ))}
@@ -275,10 +312,10 @@ export default function MarksScreen({ user, onBack }) {
                       <Button
                         label={
                           permission?.granted
-                            ? 'Open the camera'
+                            ? t('marks.openCamera')
                             : permission && !permission.canAskAgain
-                              ? 'Open settings'
-                              : 'Allow the camera'
+                              ? t('marks.openSettings')
+                              : t('marks.allowCamera')
                         }
                         icon={Camera}
                         variant="secondary"
@@ -296,11 +333,11 @@ export default function MarksScreen({ user, onBack }) {
                       <Text style={styles.hint}>
                         A spreadsheet, a Word file or a PDF. Names in one column, marks in another.
                       </Text>
-                      <Button label="Choose a file" icon={FileArrowUp} variant="secondary" onPress={pickFile} />
+                      <Button label={t('marks.chooseFile')} icon={FileArrowUp} variant="secondary" onPress={pickFile} />
                     </View>
                   ) : null}
 
-                  {busy === 'reading' ? <StateBlock kind="loading" message="Reading the sheet…" /> : null}
+                  {busy === 'reading' ? <StateBlock kind="loading" message={t('marks.reading')} /> : null}
 
                   {proposal ? (
                     <>
@@ -308,8 +345,8 @@ export default function MarksScreen({ user, onBack }) {
                         <WarningCircle size={16} color={colors.accent} weight="fill" />
                         <Text style={styles.reviewText}>
                           {needsReview > 0
-                            ? `${needsReview} row${needsReview === 1 ? '' : 's'} need checking. Nothing is saved yet.`
-                            : 'Check these, then save. Nothing is saved yet.'}
+                            ? t('marks.needsChecking', { count: needsReview })
+                            : t('marks.checkThese')}
                         </Text>
                         <Pressable onPress={() => setProposal(null)} hitSlop={8}>
                           <X size={16} color={colors.neutral[500]} />
@@ -322,6 +359,7 @@ export default function MarksScreen({ user, onBack }) {
                           row={row}
                           styles={styles}
                           colors={colors}
+                          t={t}
                           onScore={(value) => setProposal((prev) => ({
                             ...prev,
                             rows: prev.rows.map((each, i) => (
@@ -332,7 +370,7 @@ export default function MarksScreen({ user, onBack }) {
                       ))}
                     </>
                   ) : busy === 'roster' ? (
-                    <StateBlock kind="loading" message="Loading the class…" />
+                    <StateBlock kind="loading" message={t('marks.loadingClass')} />
                   ) : (
                     students.map((student) => (
                       <View key={student.id} style={styles.row}>
@@ -352,13 +390,25 @@ export default function MarksScreen({ user, onBack }) {
                   <FormError message={error} style={styles.error} />
 
                   <Button
-                    label={busy === 'saving' ? 'Saving…' : `Save ${pending.length} mark${pending.length === 1 ? '' : 's'}`}
+                    label={busy === 'saving' ? t('marks.saving') : t('marks.save', { count: pending.length })}
                     icon={FloppyDisk}
                     variant="primary"
                     onPress={save}
                     disabled={busy === 'saving' || pending.length === 0}
                     style={styles.submit}
                   />
+
+                  {canPrintDocuments(user) ? (
+                    <Button
+                      label={busy === 'printing' ? t('marks.building') : t('marks.printClass')}
+                      icon={Printer}
+                      variant="secondary"
+                      onPress={printClassMarks}
+                      loading={busy === 'printing'}
+                      disabled={!!busy}
+                      style={styles.submit}
+                    />
+                  ) : null}
                 </>
               ) : null}
             </>
@@ -370,20 +420,20 @@ export default function MarksScreen({ user, onBack }) {
 }
 
 /** One proposed mark. Says who the server matched it to, or that it could not. */
-function ProposalRow({ row, styles, colors, onScore }) {
+function ProposalRow({ row, styles, colors, onScore, t }) {
   const unmatched = !row.student_id;
   return (
     <View style={[styles.row, row.needs_review && styles.rowFlagged]}>
       <View style={styles.rowText}>
         <Text style={[styles.name, unmatched && styles.nameUnmatched]} numberOfLines={1}>
-          {row.matched_name || row.read_name || 'Unnamed'}
+          {row.matched_name || row.read_name || t('marks.unnamed')}
         </Text>
         {row.needs_review ? (
           <Text style={styles.matchNote} numberOfLines={1}>
             {unmatched
-              ? `Read as “${row.read_name}” — ${row.match}`
+              ? t('marks.readAs', { name: row.read_name, match: row.match })
               : row.match === 'not on the sheet'
-                ? 'Not on the sheet'
+                ? t('marks.notOnTheSheet')
                 : row.match}
           </Text>
         ) : null}

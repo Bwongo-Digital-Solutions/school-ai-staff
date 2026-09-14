@@ -84,6 +84,25 @@ const ROSTER_ROLES = ['admin', 'head_teacher', 'teacher'];
 export const hasRoster = (user) => !!user && ROSTER_ROLES.includes(user.role);
 
 /**
+ * Who may fetch a document full of other people's children.
+ *
+ * A report card, a whole record, a broadsheet — each carries marks and, in the case of a record,
+ * payment history, for a class at a time. The server gates these routes itself; this is so the app
+ * does not offer a button that would only ever come back refused.
+ *
+ * Narrower than `hasRoster`, which includes the head teacher. That is not an oversight but it is not
+ * obviously right either: it matches the note at `api.js`'s `documentUrl`, which is what the server
+ * was doing when these screens were written. Worth revisiting with the server's own list rather than
+ * widening it here, where the two would then disagree.
+ *
+ * Written out in `App.js` and again in `StudentCardScreen.js` before this existed; the broadsheet
+ * would have been the third copy, which is where a rule earns a name.
+ */
+const DOCUMENT_ROLES = ['admin', 'teacher'];
+
+export const canPrintDocuments = (user) => !!user && DOCUMENT_ROLES.includes(user.role);
+
+/**
  * Which feature each tab belongs to, mirroring the registry in server/licensing/plans.mjs.
  *
  * `home` and `profile` are absent on purpose, and not by oversight. Home is where a teacher lands and

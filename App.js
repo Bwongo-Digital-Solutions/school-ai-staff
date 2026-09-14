@@ -12,7 +12,7 @@ import {
 import { ThemeProvider, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError } from './api';
-import { allowedTabs, featureOn, hasRoster, isAskari } from './roles';
+import { allowedTabs, canPrintDocuments, featureOn, hasRoster, isAskari } from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
@@ -600,7 +600,7 @@ function Root() {
             /* A class set is marks and money for thirty families at once, so the button is only
                drawn for the roles the server would let through anyway. */
             onPrintClass={
-              ['admin', 'teacher'].includes((user && user.role) || '')
+              canPrintDocuments(user)
                 ? () => push({ name: 'printClass' })
                 : undefined
             }
