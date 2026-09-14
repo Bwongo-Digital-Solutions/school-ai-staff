@@ -320,6 +320,17 @@ export const classReportsUrl = ({ grade, section, sections, requesterRole }) =>
     requesterRole,
   });
 
+/**
+ * A class's marks as one table: a student per row, a subject per column.
+ *
+ * Naming a grade with no stream prints every stream in it, each as its own table on its own page —
+ * the same rule the two builders above follow. `examId` picks which sitting the marks come from;
+ * omitting it means the marks that belong to no exam, which is where every mark entered from this
+ * app has ever gone.
+ */
+export const broadsheetUrl = ({ grade, section, examId, requesterRole }) =>
+  documentUrl('/api/broadsheets.pdf', { grade, section, examId, requesterRole });
+
 /** The receipt already issued for one payment. Keyed by the payment, not the receipt. */
 export const receiptUrl = ({ paymentId, requesterRole }) =>
   documentUrl(`/api/fees/receipts/${encodeURIComponent(paymentId)}.pdf`, { requesterRole });
@@ -414,6 +425,13 @@ export const schoolApi = {
      never chooses which child a mark belongs to. */
   markClasses: () =>
     post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
+
+  /* Which sittings a broadsheet could be printed for. Read from the marks actually recorded, not
+     from the exam timetable — a school that has never created an exam still has marks, and they
+     are the ones a teacher wants on paper. */
+  markExams: ({ gradeLevel, classSection } = {}) =>
+    post('/api/functions/marks', { action: 'exams', gradeLevel, classSection })
+      .then((d) => (d && d.exams) || []),
 
   markRoster: ({ gradeLevel, classSection, subjectId, examId }) =>
     post('/api/functions/marks', {

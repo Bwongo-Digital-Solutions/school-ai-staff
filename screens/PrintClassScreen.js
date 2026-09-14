@@ -13,7 +13,7 @@ import { View, Text, ScrollView, SafeAreaView, Pressable, StyleSheet } from 'rea
 import { CheckSquare, Square, Export, Printer } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts } from '../theme';
-import { schoolApi, classReportCardsUrl, classReportsUrl, ApiError } from '../api';
+import { schoolApi, classReportCardsUrl, classReportsUrl, broadsheetUrl, ApiError } from '../api';
 import { shareDocument, printDocument } from '../share';
 import { alertError } from '../alerts';
 import ScreenHeader from '../components/ScreenHeader';
@@ -26,6 +26,7 @@ import { useT } from '../i18n';
 
 const CARDS = 'cards';
 const RECORDS = 'records';
+const MARKS = 'marks';
 
 export default function PrintClassScreen({ user, onBack }) {
   const { colors } = useTheme();
@@ -38,6 +39,13 @@ export default function PrintClassScreen({ user, onBack }) {
   const [document, setDocument] = useState(CARDS);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+
+  /* The marks table only. A whole grade of report cards or records would be a hundred pages built
+     while somebody waits; a whole grade of broadsheets is one page per stream, which is exactly how
+     a school wants them. So the other two documents are left as they were. */
+  const [wholeGrade, setWholeGrade] = useState(false);
+  const [exams, setExams] = useState(null);
+  const [examId, setExamId] = useState('');
 
   const role = (user && user.role) || '';
 
@@ -53,12 +61,42 @@ export default function PrintClassScreen({ user, onBack }) {
 
   useEffect(() => { load(); }, [load]);
 
+  /* The sittings this class has marks for. Asked per class rather than once for the school, because
+     a P6 teacher choosing between "End of Term 2" and a sitting only S4 was marked in is choosing
+     between an answer and an empty sheet. */
+  useEffect(() => {
+    if (document !== MARKS || !chosen) return undefined;
+    let current = true;
+    setExams(null);
+    schoolApi
+      .markExams({ gradeLevel: chosen.grade_level, classSection: wholeGrade ? undefined : chosen.class_section })
+      .then((found) => {
+        if (!current) return;
+        setExams(found);
+        /* The most-marked sitting first, which is the one just entered. Preselected rather than left
+           blank: a teacher who has entered one set of marks should not have to tell us which. */
+        setExamId((previous) => (found.some((exam) => exam.id === previous) ? previous : (found[0] || {}).id || ''));
+      })
+      .catch(() => { if (current) setExams([]); });
+    return () => { current = false; };
+  }, [document, chosen, wholeGrade]);
+
   /* The same file either way, named for what it holds so a folder of these can be told apart
      after the fact — which class, which stream, which document. */
   const documentSource = () => {
     const grade = chosen.grade_level;
     const section = chosen.class_section;
     const where = `grade-${grade}${section ? `-${section}` : ''}`;
+
+    if (document === MARKS) {
+      /* No stream named means every stream in the grade, each as its own table on its own page —
+         the server's rule, not a second one invented here. */
+      const scope = wholeGrade ? `grade-${grade}` : where;
+      return {
+        url: broadsheetUrl({ grade, section: wholeGrade ? '' : section, examId, requesterRole: role }),
+        filename: `broadsheet-${scope}.pdf`,
+      };
+    }
 
     return document === CARDS
       ? {
@@ -71,11 +109,21 @@ export default function PrintClassScreen({ user, onBack }) {
         };
   };
 
+  /* How many children the chosen document covers — the stream, or every stream in its grade. Read
+     off the class list rather than asked for, since the counts are already on screen. */
+  const covered = !chosen
+    ? 0
+    : (classes || [])
+      .filter((entry) => (wholeGrade && document === MARKS
+        ? entry.grade_level === chosen.grade_level
+        : entry.grade_level === chosen.grade_level && entry.class_section === chosen.class_section))
+      .reduce((sum, entry) => sum + (Number(entry.students) || 0), 0);
+
   /* A class with nobody in it has no document to build, and the server would refuse it anyway.
      Caught here so the refusal is a sentence about this class rather than a failed download —
      and so the count message below is never asked about zero students, where French would make
      "one student, this will be quick" out of an empty class. */
-  const emptyClass = !!chosen && (Number(chosen.students) || 0) === 0;
+  const emptyClass = !!chosen && covered === 0;
 
   const run = async (which, action) => {
     if (!chosen) {
@@ -84,6 +132,10 @@ export default function PrintClassScreen({ user, onBack }) {
     }
     if (emptyClass) {
       setError(t('printClass.classEmpty'));
+      return;
+    }
+    if (document === MARKS && !examId) {
+      setError(t('printClass.chooseExam'));
       return;
     }
     setBusy(which);
@@ -101,8 +153,14 @@ export default function PrintClassScreen({ user, onBack }) {
   };
 
   const print = () => run('print', (url, filename) => printDocument(url, filename));
+  const DOCUMENT_LABEL = {
+    [CARDS]: 'printClass.documentCards',
+    [RECORDS]: 'printClass.documentRecords',
+    [MARKS]: 'printClass.documentMarks',
+  };
+
   const share = () => run('share', (url, filename) => shareDocument(url, filename, {
-    title: t(document === CARDS ? 'printClass.documentCards' : 'printClass.documentRecords'),
+    title: t(DOCUMENT_LABEL[document]),
   }));
 
   const Choice = ({ on, label, hint, onPress, spaced }) => (
@@ -173,7 +231,59 @@ export default function PrintClassScreen({ user, onBack }) {
             label={t('printClass.documentRecords')}
             hint={t('printClass.documentRecordsHint')}
           />
+          <Choice
+            spaced
+            on={document === MARKS}
+            onPress={() => { setError(''); setDocument(MARKS); }}
+            label={t('printClass.documentMarks')}
+            hint={t('printClass.documentMarksHint')}
+          />
         </Card>
+
+        {document === MARKS ? (
+          <>
+            <SectionLabel>{t('printClass.howMuch')}</SectionLabel>
+            <Card style={styles.card}>
+              <Choice
+                on={!wholeGrade}
+                onPress={() => { setError(''); setWholeGrade(false); }}
+                label={t('printClass.thisStream')}
+                hint={t('printClass.thisStreamHint')}
+              />
+              <Choice
+                spaced
+                on={wholeGrade}
+                onPress={() => { setError(''); setWholeGrade(true); }}
+                label={t('printClass.everyStream')}
+                hint={t('printClass.everyStreamHint')}
+              />
+            </Card>
+
+            <SectionLabel>{t('printClass.whichExam')}</SectionLabel>
+            {!chosen ? (
+              <Card style={styles.card}>
+                <Text style={styles.caption}>{t('printClass.chooseClass')}</Text>
+              </Card>
+            ) : !exams ? (
+              <StateBlock kind="loading" message={t('printClass.examsLoading')} />
+            ) : exams.length === 0 ? (
+              <StateBlock kind="empty" message={t('printClass.noMarks')} />
+            ) : (
+              <Card style={styles.card}>
+                {exams.map((exam, index) => (
+                  <Choice
+                    key={exam.id}
+                    spaced={index > 0}
+                    on={examId === exam.id}
+                    onPress={() => { setError(''); setExamId(exam.id); }}
+                    label={exam.name}
+                    hint={t('printClass.examEntries', { count: Number(exam.entries) || 0 })}
+                  />
+                ))}
+              </Card>
+            )}
+          </>
+        ) : null}
 
         <SectionLabel>{t('printClass.sendIt')}</SectionLabel>
         <Card style={styles.card}>
@@ -183,7 +293,7 @@ export default function PrintClassScreen({ user, onBack }) {
             <Text style={styles.caption}>{t('printClass.classEmpty')}</Text>
           ) : (
             <Text style={styles.caption}>
-              {t('printClass.about', { count: Number(chosen.students) || 0 })}
+              {t('printClass.about', { count: covered })}
             </Text>
           )}
 

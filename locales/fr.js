@@ -181,6 +181,68 @@ export const fr = {
   'report.noneYet': "Aucun bulletin n'a encore été envoyé à cette famille.",
 
   /* ── a whole class's documents ──────────────────────────────────────────── */
+  /* ── saisie des notes ───────────────────────────────────────────────────── */
+  'marks.title': 'Saisir des notes',
+  'marks.loadingClasses': 'Chargement de vos classes…',
+  'marks.noClasses':
+    "Aucune classe ne vous est encore attribuée. Un administrateur vous en attribue une dans "
+    + "l'application web, sous Utilisateurs — ouvrez votre nom et choisissez Classes — et elle "
+    + 'apparaîtra ici.',
+  'marks.classAndSubject': 'Classe et matière',
+  'marks.chooseClass': 'Choisissez une classe…',
+  'marks.classOption': '{class} ({subject})',
+  'marks.loadingClass': 'Chargement de la classe…',
+
+  'marks.modeType': 'Saisir',
+  'marks.modePhoto': 'Photographier',
+  'marks.modeFile': 'Fichier',
+
+  'marks.photoHint':
+    "Photographiez une feuille de notes et les notes en sont extraites. Vous les vérifiez avant "
+    + "tout enregistrement.",
+  'marks.openCamera': "Ouvrir l'appareil photo",
+  'marks.openSettings': 'Ouvrir les réglages',
+  'marks.allowCamera': "Autoriser l'appareil photo",
+  'marks.photographTitle': 'Photographier la feuille',
+  'marks.framingHint':
+    'Cadrez toute la feuille. Les noms à gauche, les notes à droite.',
+  'marks.takePicture': 'Prendre la photo',
+  'marks.cameraFailed': "L'appareil photo n'a pas pu prendre cette photo.",
+
+  'marks.fileHint':
+    'Un tableur, un fichier Word ou un PDF. Les noms dans une colonne, les notes dans une autre.',
+  'marks.chooseFile': 'Choisir un fichier',
+  'marks.reading': 'Lecture de la feuille…',
+  'marks.fileUnreadable': "Ce fichier n'a pas pu être lu.",
+  'marks.notRead': 'Non lu',
+  'marks.fileUnopenable': "Ce fichier n'a pas pu être ouvert.",
+
+  'marks.needsChecking': {
+    one: '{count} ligne à vérifier. Rien n\'est encore enregistré.',
+    other: '{count} lignes à vérifier. Rien n\'est encore enregistré.',
+  },
+  'marks.checkThese': "Vérifiez ces lignes, puis enregistrez. Rien n'est encore enregistré.",
+  'marks.unnamed': 'Sans nom',
+  'marks.readAs': 'Lu comme « {name} » — {match}',
+  'marks.notOnTheSheet': 'Absent de la feuille',
+
+  'marks.nothingToSave': "Il n'y a encore aucune note à enregistrer.",
+  'marks.saving': 'Enregistrement…',
+  'marks.save': { one: 'Enregistrer {count} note', other: 'Enregistrer {count} notes' },
+  'marks.unconfirmed': "Le serveur n'a pas confirmé les notes. Rien n'a été enregistré.",
+  'marks.saved': 'Notes enregistrées',
+  'marks.savedCount': {
+    one: '{count} enregistrée en {subject}',
+    other: '{count} enregistrées en {subject}',
+  },
+  'marks.notSaved': 'Non enregistré',
+  'marks.saveFailed': "Ces notes n'ont pas été enregistrées.",
+
+  'marks.building': 'Construction…',
+  'marks.printClass': 'Imprimer cette classe',
+  'marks.notPrinted': 'Non imprimé',
+  'marks.printFailed': "Ce tableau n'a pas pu être imprimé.",
+
   'printClass.title': 'Imprimer une classe',
   'printClass.whichClass': 'Quelle classe',
   'printClass.loading': 'Chargement des classes…',
@@ -194,6 +256,19 @@ export const fr = {
   'printClass.documentRecords': 'Dossiers complets',
   'printClass.documentRecordsHint':
     'Notes, présences, frais et coordonnées — plusieurs pages chacun',
+  'printClass.documentMarks': 'Tableau de notes',
+  'printClass.documentMarksHint':
+    'Une ligne par élève, une colonne par matière — une page par classe',
+  'printClass.howMuch': 'Quelle étendue',
+  'printClass.thisStream': 'Cette série uniquement',
+  'printClass.thisStreamHint': 'Un seul tableau, pour la classe choisie',
+  'printClass.everyStream': 'Toutes les séries de ce niveau',
+  'printClass.everyStreamHint': 'Un tableau par série, chacun sur sa propre page',
+  'printClass.whichExam': 'Quelles notes',
+  'printClass.examsLoading': 'Recherche des notes saisies…',
+  'printClass.noMarks': "Aucune note n'a encore été saisie pour cette classe.",
+  'printClass.examEntries': { one: '{count} note saisie', other: '{count} notes saisies' },
+  'printClass.chooseExam': 'Choisissez les notes à imprimer.',
   'printClass.sendIt': 'Imprimer',
   'printClass.chooseClass': "Choisissez d'abord une classe.",
   'printClass.about': {

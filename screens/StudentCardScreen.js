@@ -19,6 +19,7 @@ import {
   IdentificationCard,
   MapPin,
   Phone,
+  Printer,
   SealCheck,
   SealWarning,
   ShieldCheck,
@@ -29,9 +30,10 @@ import {
   X,
 } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
-import { schoolApi, ApiError, receiptUrl } from '../api';
+import { schoolApi, ApiError, receiptUrl, broadsheetUrl } from '../api';
+import { printDocument } from '../share';
 import { decideGatePass, gateFailureText } from '../gate';
-import { designationOf } from '../roles';
+import { canPrintDocuments, designationOf } from '../roles';
 import { dateTime, formatDate, humanise, money } from '../format';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -116,7 +118,31 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
   const student = card.student;
   /* Reports carry marks and payment history, so the server only builds one for staff who
      already hold the roster. Offering the button to anyone else would be a dead end. */
-  const canSendReport = !!onSendReport && ['admin', 'teacher'].includes((user && user.role) || '');
+  const canSendReport = !!onSendReport && canPrintDocuments(user);
+
+  /* The marks table for the class this child is in, from the card already open.
+     Their class rather than them alone, and deliberately: a single row of marks says nothing a
+     teacher cannot already see above it, while the same row among its classmates is what tells them
+     whether a 62 is a good week or a bad one. The child's own row is on it either way. */
+  const [printing, setPrinting] = useState(false);
+
+  const printClassMarks = async () => {
+    setPrinting(true);
+    try {
+      await printDocument(
+        broadsheetUrl({
+          grade: student.grade_level,
+          section: student.class_section,
+          requesterRole: (user && user.role) || '',
+        }),
+        `broadsheet-grade-${student.grade_level}-${student.class_section || ''}.pdf`,
+      );
+    } catch (err) {
+      alertError('Not printed', err);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -124,10 +150,23 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
         title={student.full_name}
         onBack={onBack}
         right={
-          canSendReport ? (
-            <Pressable onPress={() => onSendReport(card)} hitSlop={12} accessibilityLabel="Send a report">
-              <Export size={22} color={colors.text} weight="regular" />
-            </Pressable>
+          canPrintDocuments(user) ? (
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={printing ? undefined : printClassMarks}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Print this class's marks"
+                accessibilityState={{ disabled: printing }}
+              >
+                <Printer size={22} color={printing ? colors.neutral[500] : colors.text} weight="regular" />
+              </Pressable>
+              {canSendReport ? (
+                <Pressable onPress={() => onSendReport(card)} hitSlop={12} accessibilityLabel="Send a report">
+                  <Export size={22} color={colors.text} weight="regular" />
+                </Pressable>
+              ) : null}
+            </View>
           ) : null
         }
       />
@@ -1315,6 +1354,11 @@ const createStyles = (colors) =>
     },
     flex: {
       flex: 1,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.lg,
     },
     scrollContent: {
       paddingHorizontal: spacing.xxl,

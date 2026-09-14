@@ -166,6 +166,66 @@ export const en = {
   'report.lastHandedOver': 'Last report handed over {when} by {who}',
   'report.noneYet': 'No report has been sent to this family yet.',
 
+  /* ── recording marks ────────────────────────────────────────────────────── */
+  'marks.title': 'Record marks',
+  'marks.loadingClasses': 'Loading your classes…',
+  'marks.noClasses':
+    'You have no classes assigned yet. An administrator gives you one on the web app under '
+    + 'Users — open your name and choose Classes — and it appears here.',
+  'marks.classAndSubject': 'Class and subject',
+  'marks.chooseClass': 'Choose a class…',
+  'marks.classOption': '{class} ({subject})',
+  'marks.loadingClass': 'Loading the class…',
+
+  'marks.modeType': 'Type',
+  'marks.modePhoto': 'Photograph',
+  'marks.modeFile': 'File',
+
+  'marks.photoHint':
+    'Photograph a mark sheet and the marks are read off it. You check them before anything is saved.',
+  'marks.openCamera': 'Open the camera',
+  'marks.openSettings': 'Open settings',
+  'marks.allowCamera': 'Allow the camera',
+  'marks.photographTitle': 'Photograph the sheet',
+  'marks.framingHint': 'Fill the frame with the sheet. Names on the left, marks on the right.',
+  'marks.takePicture': 'Take the picture',
+  'marks.cameraFailed': 'The camera could not take that picture.',
+
+  'marks.fileHint': 'A spreadsheet, a Word file or a PDF. Names in one column, marks in another.',
+  'marks.chooseFile': 'Choose a file',
+  'marks.reading': 'Reading the sheet…',
+  'marks.fileUnreadable': 'That file could not be read.',
+  'marks.notRead': 'Not read',
+  'marks.fileUnopenable': 'That file could not be opened.',
+
+  'marks.needsChecking': {
+    one: '{count} row needs checking. Nothing is saved yet.',
+    other: '{count} rows need checking. Nothing is saved yet.',
+  },
+  'marks.checkThese': 'Check these, then save. Nothing is saved yet.',
+  'marks.unnamed': 'Unnamed',
+  'marks.readAs': 'Read as “{name}” — {match}',
+  'marks.notOnTheSheet': 'Not on the sheet',
+
+  'marks.nothingToSave': 'There are no marks to save yet.',
+  'marks.saving': 'Saving…',
+  'marks.save': { one: 'Save {count} mark', other: 'Save {count} marks' },
+  'marks.unconfirmed': 'The server did not confirm the marks. Nothing was saved.',
+  'marks.saved': 'Marks saved',
+  /* The subject follows a colon rather than sitting inside the sentence. French would otherwise need
+     a participle agreeing with an interpolated noun it cannot see. */
+  'marks.savedCount': {
+    one: '{count} recorded in {subject}',
+    other: '{count} recorded in {subject}',
+  },
+  'marks.notSaved': 'Not saved',
+  'marks.saveFailed': 'Those marks were not saved.',
+
+  'marks.building': 'Building…',
+  'marks.printClass': 'Print this class',
+  'marks.notPrinted': 'Not printed',
+  'marks.printFailed': 'That table could not be printed.',
+
   /* ── a whole class's documents ──────────────────────────────────────────── */
   'printClass.title': 'Print a class',
   'printClass.whichClass': 'Which class',
@@ -179,6 +239,18 @@ export const en = {
   'printClass.documentCardsHint': "This term's marks, one card per student",
   'printClass.documentRecords': 'Whole records',
   'printClass.documentRecordsHint': 'Marks, attendance, fees and details — several pages each',
+  'printClass.documentMarks': 'Marks table',
+  'printClass.documentMarksHint': 'One row per student, a column per subject — one page per class',
+  'printClass.howMuch': 'How much of it',
+  'printClass.thisStream': 'This stream only',
+  'printClass.thisStreamHint': 'One table, for the class you chose',
+  'printClass.everyStream': 'Every stream in this grade',
+  'printClass.everyStreamHint': 'One table per stream, each on its own page',
+  'printClass.whichExam': 'Which marks',
+  'printClass.examsLoading': 'Looking for recorded marks…',
+  'printClass.noMarks': 'No marks have been recorded for this class yet.',
+  'printClass.examEntries': { one: '{count} mark recorded', other: '{count} marks recorded' },
+  'printClass.chooseExam': 'Choose which marks to print.',
   'printClass.sendIt': 'Print it',
   'printClass.chooseClass': 'Choose a class first.',
   'printClass.about': {
