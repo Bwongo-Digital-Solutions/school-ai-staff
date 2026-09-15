@@ -20,7 +20,7 @@ import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
 import Select from '../components/Select';
 import Field, { FormError } from '../components/Field';
-import { alertSuccess, alertError } from '../alerts';
+import { alertSuccess, alertError, alertWarning } from '../alerts';
 
 export default function ComposeScreen({ user, onSent, onBack }) {
   const { t } = useT();
@@ -107,7 +107,7 @@ export default function ComposeScreen({ user, onSent, onBack }) {
 
     setBusy(true);
     try {
-      await schoolApi.sendMessage({
+      const sent = await schoolApi.sendMessage({
         actorEmail: user.auth_email,
         audienceKind: kind,
         audienceValue: value,
@@ -116,6 +116,12 @@ export default function ComposeScreen({ user, onSent, onBack }) {
         body: trimmedBody,
         priority: important ? 'high' : 'normal',
       });
+      /* Queued rather than sent. The form is still cleared — the message is written and will go —
+         but the person is told where it currently is. */
+      if (sent && sent.queued) {
+        alertWarning(t('sync.queued'), t('sync.queuedDetail'));
+      }
+
       setSubject('');
       setBody('');
       setImportant(false);

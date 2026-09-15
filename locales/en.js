@@ -287,6 +287,12 @@ export const en = {
   'home.registerStudent': 'Register a student',
   'home.recentStudents': 'Recent students',
 
+  /* The outbox: work done without a signal, waiting to reach the server. */
+  'sync.waiting': { one: '{count} thing waiting to be sent', other: '{count} things waiting to be sent' },
+  'sync.explain': 'Saved on this phone. It will be sent when the network comes back.',
+  'sync.retry': 'Try now',
+  'sync.queued': 'Saved on this phone',
+  'sync.queuedDetail': 'No network just now. It will be sent when the signal comes back.',
 };
 
 export default en;

@@ -36,7 +36,7 @@ import Select from '../components/Select';
 import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
 import { FormError } from '../components/Field';
-import { alertSuccess, alertError } from '../alerts';
+import { alertSuccess, alertError, alertWarning } from '../alerts';
 import { useT } from '../i18n';
 import { classOf } from '../format';
 
@@ -187,6 +187,15 @@ export default function MarksScreen({ user, onBack }) {
         marks: pending,
         source: proposal ? (proposal.read_by === 'model' ? 'photo' : 'file') : 'manual',
       });
+      /* No signal: the marks are on the outbox and go when the network returns. Said as a warning
+         rather than a success, because "saved on this phone" and "saved at the school" are
+         different facts and a teacher is entitled to know which one happened. */
+      if (res && res.queued) {
+        alertWarning(t('sync.queued'), t('sync.queuedDetail'));
+        setPending({});
+        return;
+      }
+
       // Reported only once the server says how many rows it wrote.
       if (!res || typeof res.saved !== 'number') {
         throw new ApiError(t('marks.unconfirmed'), 0);

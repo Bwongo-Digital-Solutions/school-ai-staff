@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatLocale } from './format';
+import { enqueue, flush } from './outbox';
 
 const BASE_KEY = 'kps.apiBase';
 const TOKEN_KEY = 'kps.sessionToken';
@@ -176,15 +177,56 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
 }
 
 function post(path, body, options) {
+  const key = options && options.idempotencyKey;
   return request(
     path,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        /* Only sent when there is one. The server treats a keyed POST as repeatable and remembers
+           its answer; an unkeyed one behaves exactly as it always has. */
+        ...(key ? { 'Idempotency-Key': key } : {}),
+      },
       body: JSON.stringify(scrub(body || {})),
     },
     options,
   );
+}
+
+/**
+ * A write that survives having no signal.
+ *
+ * Tries to send it now. If the request never reached the server — `status === 0`, which is what a
+ * transport failure produces — the work is put on the outbox and sent when the network returns,
+ * and the caller is told `{ queued: true }` rather than being handed an error.
+ *
+ * That distinction is the whole point: "saved, and it will reach the office shortly" and "not
+ * saved, do it again" are different things to tell a teacher standing in a classroom, and until now
+ * the app could only say the second.
+ *
+ * Anything else — a refusal, a bad request, an expired session — throws exactly as before. The
+ * server answered, and queueing an answer it has already given would be wrong.
+ */
+async function queuedPost(path, body, label, options) {
+  const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    return await post(path, body, { ...options, idempotencyKey: key });
+  } catch (error) {
+    if (Number(error && error.status)) throw error;
+    const entry = await enqueue({ path, body, label, options });
+    return { queued: true, queuedKey: entry.key };
+  }
+}
+
+/**
+ * Send whatever is waiting.
+ *
+ * Each entry keeps the key it was queued with, so a replay of work the server already did is
+ * answered with the original result rather than doing it twice.
+ */
+export function flushOutbox() {
+  return flush((entry) => post(entry.path, entry.body, { ...entry.options, idempotencyKey: entry.key }));
 }
 
 function get(path, options) {
@@ -444,9 +486,9 @@ export const schoolApi = {
     }, { timeout: 120000 }),
 
   saveMarks: ({ gradeLevel, classSection, subjectId, examId, marks, source }) =>
-    post('/api/functions/marks', {
+    queuedPost('/api/functions/marks', {
       action: 'save', gradeLevel, classSection, subjectId, examId, marks, source,
-    }, { timeout: 60000 }),
+    }, `${gradeLevel}${classSection}`, { timeout: 60000 }),
 
   /* Enrolling a student. The number comes from the server both times — asked for up front so the
      desk can read it out, and issued again at registration in case another phone took it. */
@@ -454,7 +496,11 @@ export const schoolApi = {
     post('/api/functions/student-registry', { action: 'next_number' }).then((d) => (d && d.student_id) || ''),
 
   registerStudent: (student) =>
-    post('/api/functions/student-registry', { action: 'register', ...student }),
+    queuedPost(
+      '/api/functions/student-registry',
+      { action: 'register', ...student },
+      `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+    ),
 
   /* permissionId names the exact slip being answered. Without it the server falls back to the
      newest open one for that student, which is right for a bare scan but wrong when two are
@@ -462,9 +508,9 @@ export const schoolApi = {
   recordGatePass: ({
     code, direction, decision, authorisedBy, reason, destination, note, recordedBy, permissionId,
   }) =>
-    post('/api/functions/gate-pass', {
+    queuedPost('/api/functions/gate-pass', {
       code, direction, decision, authorisedBy, reason, destination, note, recordedBy, permissionId,
-    }),
+    }, code),
 
   /* Every slip still open and still in date: granted, not yet acted on at the gate, and not
      cancelled by whoever wrote it. Deliberately not scoped to today — a student cleared to
@@ -473,12 +519,12 @@ export const schoolApi = {
     post('/api/functions/gate-permission', { action: 'pending' }).then((d) => (d && d.pending) || []),
 
   grantGatePermission: ({ code, reason, destination, expectedReturn, grantedBy, grantedByEmail }) =>
-    post('/api/functions/gate-permission', {
+    queuedPost('/api/functions/gate-permission', {
       action: 'grant', code, reason, destination, expectedReturn, grantedBy, grantedByEmail,
-    }),
+    }, code),
 
   cancelGatePermission: ({ permissionId, by }) =>
-    post('/api/functions/gate-permission', { action: 'cancel', permissionId, by }),
+    queuedPost('/api/functions/gate-permission', { action: 'cancel', permissionId, by }, permissionId),
 
   /** The gate's movement log: who went which way, when, and whether they were let through. */
   gateLog: ({ date, limit } = {}) => post('/api/functions/gate-log', { date, limit }),
@@ -490,9 +536,9 @@ export const schoolApi = {
     post('/api/functions/messages', { action: 'staff', actorEmail }),
 
   sendMessage: ({ actorEmail, audienceKind, audienceValue, recipientEmail, subject, body, priority }) =>
-    post('/api/functions/messages', {
+    queuedPost('/api/functions/messages', {
       action: 'send', actorEmail, audienceKind, audienceValue, recipientEmail, subject, body, priority,
-    }),
+    }, subject),
 
   markMessageRead: ({ actorEmail, messageId }) =>
     post('/api/functions/messages', { action: 'read', actorEmail, messageId }),
@@ -507,7 +553,7 @@ export const schoolApi = {
     post('/api/functions/roll-call', { action: 'register', gradeLevel, classSection, date }),
 
   markAttendance: ({ code, status, date, reason, markedBy }) =>
-    post('/api/functions/roll-call', { action: 'mark', code, status, date, reason, markedBy }),
+    queuedPost('/api/functions/roll-call', { action: 'mark', code, status, date, reason, markedBy }, code),
 
   grantExamClearance: ({ code, note, grantedBy, grantedByEmail, validUntil }) =>
     post('/api/functions/exam-clearance', {
@@ -515,11 +561,11 @@ export const schoolApi = {
     }),
 
   revokeExamClearance: ({ clearanceId, by }) =>
-    post('/api/functions/exam-clearance', { action: 'revoke', clearanceId, by }),
+    queuedPost('/api/functions/exam-clearance', { action: 'revoke', clearanceId, by }, clearanceId),
 
   /** The invigilator's verdict at the exam room door. */
   admitToExam: ({ code, decision, note, recordedBy }) =>
-    post('/api/functions/exam-clearance', { action: 'admit', code, decision, note, recordedBy }),
+    queuedPost('/api/functions/exam-clearance', { action: 'admit', code, decision, note, recordedBy }, code),
 
   /* The assistant and search are refused server-side for anyone but an admin or teacher,
      so `requesterRole` is passed through rather than trusted from the UI alone. */
@@ -552,7 +598,7 @@ export const schoolApi = {
       .then((d) => (d && d.last_sent) || null),
 
   recordMeal: ({ code, meal, servedBy }) =>
-    post('/api/functions/meal-record', { code, meal, servedBy }),
+    queuedPost('/api/functions/meal-record', { code, meal, servedBy }, code),
 
   listStudents: () =>
     dbSelect({
@@ -630,7 +676,7 @@ export const schoolApi = {
       .then((d) => (d && d.clubs) || []),
 
   joinClub: ({ clubId, studentId }) =>
-    post('/api/functions/clubs', { action: 'join', clubId, studentId }),
+    queuedPost('/api/functions/clubs', { action: 'join', clubId, studentId }, studentId),
 
   leaveClub: ({ clubId, studentId }) =>
     post('/api/functions/clubs', { action: 'leave', clubId, studentId }),
