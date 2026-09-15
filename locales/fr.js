@@ -305,6 +305,14 @@ export const fr = {
   'home.registerStudent': 'Inscrire un élève',
   'home.recentStudents': 'Élèves récents',
 
+  'sync.waiting': {
+    one: "{count} élément en attente d'envoi",
+    other: "{count} éléments en attente d'envoi",
+  },
+  'sync.explain': "Enregistré sur ce téléphone. L'envoi se fera au retour du réseau.",
+  'sync.retry': 'Essayer maintenant',
+  'sync.queued': 'Enregistré sur ce téléphone',
+  'sync.queuedDetail': "Pas de réseau pour le moment. L'envoi se fera au retour du signal.",
 };
 
 export default fr;

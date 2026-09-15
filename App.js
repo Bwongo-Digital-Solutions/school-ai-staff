@@ -11,7 +11,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { ThemeProvider, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
-import { api, schoolApi, ApiError } from './api';
+import { api, schoolApi, ApiError, flushOutbox } from './api';
+import { onPendingChange } from './outbox';
 import { allowedTabs, canPrintDocuments, featureOn, hasRoster, isAskari } from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
@@ -26,6 +27,7 @@ import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PrintClassScreen from './screens/PrintClassScreen';
 import UpdateBanner from './components/UpdateBanner';
+import SyncBanner from './components/SyncBanner';
 import { checkForUpdate, dismissUpdate } from './update';
 import PendingGateScreen from './screens/PendingGateScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
@@ -120,6 +122,37 @@ function Root() {
      request. `checkForUpdate` answers null for everything uninteresting, so this either has
      something worth saying or it has nothing. */
   const UPDATE_CHECK_FLOOR_MS = 6 * 60 * 60 * 1000;
+
+  /* How much work is waiting to reach the server, kept live by the outbox itself rather than
+     polled — enqueuing happens inside the api layer, where this component cannot see it. */
+  const [pendingWrites, setPendingWrites] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => onPendingChange(setPendingWrites), []);
+
+  /**
+   * Send whatever is waiting.
+   *
+   * Guarded against overlapping runs: the foreground event and the timer can land together, and two
+   * flushes at once would race to send the same entry twice. The server would dedupe it — every
+   * queued entry carries its key — but a request that need not be made is better not made on a
+   * phone paying for its own data.
+   */
+  const syncingRef = useRef(false);
+  const drainOutbox = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    setSyncing(true);
+    try {
+      await flushOutbox();
+    } catch {
+      /* flush() reports rather than throws; anything reaching here is unexpected and must not take
+         the app down for work that is still safely on the queue. */
+    } finally {
+      syncingRef.current = false;
+      setSyncing(false);
+    }
+  }, []);
 
   const lookForUpdate = useCallback(async () => {
     if (Date.now() - updateCheckedAt.current < UPDATE_CHECK_FLOOR_MS) return;
@@ -467,6 +500,10 @@ function Root() {
       timer = setInterval(() => {
         refreshInbox();
         refreshPendingGate();
+        /* The app can be open and still while the signal returns — standing at a gate, screen on,
+           nobody touching it. Without this the queue would wait for the next foreground event that
+           may not come for hours. */
+        void drainOutbox();
       }, INBOX_POLL_MS);
     };
     const stop = () => {
@@ -481,6 +518,7 @@ function Root() {
       lookForUpdate();
       lookForFeatures();
       lookForOverview();
+      void drainOutbox();
       start();
     }
     const sub = AppState.addEventListener('change', (state) => {
@@ -490,6 +528,9 @@ function Root() {
         lookForUpdate();
         lookForFeatures();
         lookForOverview();
+        /* Coming back to the app is the moment most likely to follow walking back into signal, so
+           it is the most valuable place to try. */
+        void drainOutbox();
         start();
       } else {
         stop();
@@ -500,7 +541,7 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures, lookForOverview]);
+  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures, lookForOverview, drainOutbox]);
 
   useNewMessageChime(inbox);
 
@@ -534,6 +575,10 @@ function Root() {
      roster screens never flash an empty state before the first request. */
   const pending = hasRoster(user) && (loading || (!loadedRef.current && !error));
 
+  const syncBanner = (
+    <SyncBanner pending={pendingWrites} busy={syncing} onRetry={drainOutbox} />
+  );
+
   const updateBanner = update ? (
     <UpdateBanner
       update={update}
@@ -553,6 +598,10 @@ function Root() {
           be — and outside the tab content, so no screen has to know it exists. It sits at the
           root of the stack only: it must not cover a scan in progress or a form half filled in. */}
       {atRoot ? updateBanner : null}
+      {/* Unlike the update banner this is shown on every screen, not only at the root. Unsent work
+          is the person's own and they should be able to see it is still unsent from wherever they
+          are — including the screen they were on when the signal went. */}
+      {syncBanner}
       <View style={styles.flex}>
         {route.name === 'home' && (
           <HomeScreen

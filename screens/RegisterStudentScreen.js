@@ -160,6 +160,19 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
         requirementsBrought: broughtItems,
       });
 
+      /* No signal: the enrolment is on the outbox and will be sent when the network returns. Said
+         plainly rather than dressed up as success — the child is enrolled on this phone and not yet
+         at the office, and the clerk needs to know which of those is true. The number the desk read
+         out is not confirmed yet either, so the form is cleared and a fresh one asked for. */
+      if (res && res.queued) {
+        alertWarning(t('sync.queued'), t('sync.queuedDetail'));
+        setForm(EMPTY);
+        setChosenClubs([]);
+        setBroughtItems([]);
+        loadNumber();
+        return;
+      }
+
       // Only done once the server hands back the row it wrote, as everywhere else in this app.
       if (!res || !res.student || !res.student.student_id) {
         throw new ApiError('The server did not confirm the registration. Nothing was saved.', 0);

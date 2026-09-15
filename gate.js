@@ -40,6 +40,11 @@ export async function decideGatePass({
     permissionId: (permission && permission.id) || undefined,
   });
 
+  /* Queued: the gate had no signal and the movement is on the outbox. Returned as-is rather than
+     thrown, so the caller can say "recorded on this phone" instead of "not recorded" — at a gate
+     with a queue of children, those are very different instructions to the askari. */
+  if (res && res.queued) return res;
+
   if (!res || !res.pass || res.pass.decision !== decision) {
     throw new ApiError('The server did not confirm the movement. Nothing was recorded.', 0);
   }
