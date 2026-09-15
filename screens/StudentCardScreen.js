@@ -80,6 +80,14 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
+  /* Up here with the other hooks, and it has to stay here.
+     This screen returns early while the card is loading, so a hook placed below that return is
+     skipped on the first render and called on the second — React counts hooks per render and
+     throws "Rendered more hooks than during the previous render", which blanks the whole screen.
+     It read more naturally beside printClassMarks below; that cost the scan and the roster their
+     student card entirely. */
+  const [printing, setPrinting] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setError('');
@@ -124,8 +132,6 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
      Their class rather than them alone, and deliberately: a single row of marks says nothing a
      teacher cannot already see above it, while the same row among its classmates is what tells them
      whether a 62 is a good week or a bad one. The child's own row is on it either way. */
-  const [printing, setPrinting] = useState(false);
-
   const printClassMarks = async () => {
     setPrinting(true);
     try {
