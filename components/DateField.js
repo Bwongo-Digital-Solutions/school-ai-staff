@@ -17,10 +17,14 @@ import { parseIso, toIso, monthGrid, yearRange } from '../date-core.js';
  * value every report card that child ever receives is printed against.
  *
  * Built out of the app's own pieces — a Pressable, a Modal and the existing Select — for the
- * reason Select itself gives: a picker library is not worth a dependency here. It is also worth
- * more than that. A native date picker is a native module, so it would not reach a single phone
- * until every one of them had a rebuilt APK installed; this ships in an ordinary JavaScript
- * update, like the rest of the app.
+ * reason Select itself gives: a picker library is not worth a dependency here.
+ *
+ * Every change to this app needs a new APK, this one included: `expo-updates` is not installed and
+ * app.json carries no `updates` block, so there is no over-the-air path — update.js hands the
+ * teacher an apkUrl and they install it. What choosing JavaScript over a native picker buys is
+ * therefore not "no rebuild". It is that the rebuild is the ordinary one build-apk.yml already
+ * runs: no new dependency to link, no native configuration to get wrong, and no window in which a
+ * phone has the new JavaScript and not the native half it needs.
  *
  * Month and year are dropdowns rather than arrows. A date of birth is fifteen years back, and
  * stepping a month at a time is what makes people give up and type.
