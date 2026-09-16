@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet, ScrollView } from 'react-native';
 import {
   Bed,
   CalendarCheck,
@@ -22,6 +22,7 @@ import {
 } from '../roles';
 import { useT } from '../i18n';
 import { GATE_ACTIONS } from './GateConfirmScreen';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
 import Button from '../components/Button';
@@ -124,7 +125,7 @@ export default function HomeScreen({
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerRow}>
           <Image source={logo} style={styles.logo} resizeMode="contain" />
@@ -278,7 +279,7 @@ export default function HomeScreen({
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

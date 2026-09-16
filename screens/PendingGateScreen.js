@@ -9,7 +9,7 @@
    of the day it was granted, so nothing here is left over from yesterday. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { SignOut, Prohibit, MapPin, Clock } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts, type } from '../theme';
@@ -17,6 +17,7 @@ import { schoolApi, ApiError } from '../api';
 import { decideGatePass, gateFailureText } from '../gate';
 import { alertSuccess, alertError } from '../alerts';
 import { formatTime } from '../format';
+import Screen from '../components/Screen';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -92,7 +93,7 @@ export default function PendingGateScreen({ user, onBack }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title="Expected out today" onBack={onBack} />
       <ScrollView
         style={styles.flex}
@@ -194,7 +195,7 @@ export default function PendingGateScreen({ user, onBack }) {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

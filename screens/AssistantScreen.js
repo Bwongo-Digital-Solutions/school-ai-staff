@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -22,6 +21,7 @@ import {
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { schoolApi } from '../api';
 import { humanise, initialsOf } from '../format';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import StateBlock from '../components/StateBlock';
 import SectionLabel from '../components/SectionLabel';
@@ -44,7 +44,7 @@ export default function AssistantScreen({ user, chat, onChatChange, onOpenStuden
   const [panel, setPanel] = useState('chat');
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Assistant</Text>
       </View>
@@ -78,7 +78,7 @@ export default function AssistantScreen({ user, chat, onChatChange, onOpenStuden
           colors={colors}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   );
 }
 

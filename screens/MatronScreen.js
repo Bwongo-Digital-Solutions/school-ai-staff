@@ -12,7 +12,7 @@
    person. 'away' is the one the office signed out. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import {
   Bed, FirstAid, Heartbeat, Moon, PencilSimple, Plus, SignOut, Trash, Warning,
 } from 'phosphor-react-native';
@@ -21,6 +21,7 @@ import { useTheme, spacing, fonts, radius, type } from '../theme';
 import { schoolApi, ApiError } from '../api';
 import { alertSuccess, alertError } from '../alerts';
 import { formatTime } from '../format';
+import Screen from '../components/Screen';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -257,7 +258,7 @@ export default function MatronScreen({ user, onBack }) {
     );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title="Dormitories" onBack={onBack} />
 
       <ScrollView
@@ -647,7 +648,7 @@ export default function MatronScreen({ user, onBack }) {
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

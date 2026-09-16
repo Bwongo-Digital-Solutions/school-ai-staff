@@ -5,7 +5,6 @@ import {
   Switch,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
 import { Moon, Cloud, ArrowsClockwise, LockSimple, SignOut, Translate } from 'phosphor-react-native';
 import { useBranding } from '../branding';
@@ -13,6 +12,7 @@ import { APP_FOOTER } from '../version';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { hasRoster, roleLabel, scanPurposeKey } from '../roles';
 import { LANGUAGES, LANGUAGE_LABELS, useT } from '../i18n';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
 import Button from '../components/Button';
@@ -55,7 +55,7 @@ export default function ProfileScreen({
   const otherLanguage = LANGUAGES.find((code) => code !== language) || 'en';
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>{t('profile.title')}</Text>
 
@@ -153,7 +153,7 @@ export default function ProfileScreen({
         <Text style={styles.footNote}>{schoolName} · {t('profile.staffApp')}</Text>
         <Text style={styles.footVersion}>{APP_FOOTER}</Text>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

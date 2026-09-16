@@ -9,13 +9,14 @@
    in the class before anything starts, and it says which document is the heavy one. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { CheckSquare, Square, Export, Printer } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts } from '../theme';
 import { schoolApi, classReportCardsUrl, classReportsUrl, broadsheetUrl, ApiError } from '../api';
 import { shareDocument, printDocument } from '../share';
 import { alertError } from '../alerts';
+import Screen from '../components/Screen';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -183,7 +184,7 @@ export default function PrintClassScreen({ user, onBack }) {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title={t('printClass.title')} onBack={onBack} />
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
         <SectionLabel>{t('printClass.whichClass')}</SectionLabel>
@@ -319,7 +320,7 @@ export default function PrintClassScreen({ user, onBack }) {
           {error ? <FormError message={error} /> : null}
         </Card>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

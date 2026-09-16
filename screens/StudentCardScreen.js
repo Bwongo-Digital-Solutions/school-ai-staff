@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import {
   Bed,
   BookOpen,
@@ -35,6 +35,7 @@ import { printDocument } from '../share';
 import { decideGatePass, gateFailureText } from '../gate';
 import { canPrintDocuments, designationOf } from '../roles';
 import { dateTime, formatDate, humanise, money, todayIso } from '../format';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
@@ -108,19 +109,19 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <Screen style={styles.safe}>
         <ScreenHeader title="Student" onBack={onBack} />
         <StateBlock kind="error" message={error} onRetry={reload} />
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   if (!card) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <Screen style={styles.safe}>
         <ScreenHeader title="Student" onBack={onBack} />
         <StateBlock kind="loading" message="Loading student card…" />
-      </SafeAreaView>
+      </Screen>
     );
   }
 
@@ -152,7 +153,7 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader
         title={student.full_name}
         onBack={onBack}
@@ -203,7 +204,7 @@ export default function StudentCardScreen({ code, user, onBack, onSendReport }) 
           return <Section key={section} card={card} user={user} reload={reload} />;
         })}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

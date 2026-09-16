@@ -12,7 +12,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +21,7 @@ import { useTheme, spacing, fonts, radius, type } from '../theme';
 import { LEVEL_LABEL_KEYS, levelForGrade } from '../roles';
 import { useT } from '../i18n';
 import { schoolApi, ApiError } from '../api';
+import Screen from '../components/Screen';
 import Button from '../components/Button';
 import Select from '../components/Select';
 import ScreenHeader from '../components/ScreenHeader';
@@ -211,7 +211,7 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title="Register a student" onBack={onBack} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -393,7 +393,7 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
           />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

@@ -6,11 +6,11 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
 import { MagnifyingGlass, X, Printer } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { fullName } from '../format';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import StudentRow from '../components/StudentRow';
 import StateBlock from '../components/StateBlock';
@@ -47,7 +47,7 @@ export default function StudentsScreen({
     : t('students.enrolled', { count: students.length });
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('tab.students')}</Text>
         {/* The count and the print button travel together on the right. Grouped rather than left
@@ -114,7 +114,7 @@ export default function StudentsScreen({
           </Card>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

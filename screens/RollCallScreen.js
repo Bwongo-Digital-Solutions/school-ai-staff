@@ -6,12 +6,12 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
 import { Check, MagnifyingGlass, QrCode, X } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi, ApiError } from '../api';
 import { formatDate, humanise, initialsOf, todayIso } from '../format';
+import Screen from '../components/Screen';
 import Card from '../components/Card';
 import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
@@ -161,7 +161,7 @@ export default function RollCallScreen({
   }, [register, query]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader
         title="Roll call"
         onBack={onBack}
@@ -290,7 +290,7 @@ export default function RollCallScreen({
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
