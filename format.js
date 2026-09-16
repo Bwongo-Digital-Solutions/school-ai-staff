@@ -18,6 +18,30 @@ const MONTHS = {
   fr: ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'],
 };
 
+/* The full month names, for the date picker's month dropdown, and the weekday initials for its
+   grid. Written out for the same reason as the short forms above — Hermes has no full `Intl` here,
+   so asking for them would give English on the devices this actually runs on.
+
+   French months are lower case: a French reader writes "14 mars 2011", never "14 Mars 2011". The
+   week starts on Monday in both languages, which is what the grid below is ordered by. */
+const MONTH_NAMES = {
+  en: ['January', 'February', 'March', 'April', 'May', 'June',
+       'July', 'August', 'September', 'October', 'November', 'December'],
+  fr: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+       'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+};
+
+const WEEKDAYS = {
+  en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+  fr: ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'],
+};
+
+/** The twelve month names in the language now being read, January first. */
+export const monthNames = () => MONTH_NAMES[locale];
+
+/** The seven weekday initials, Monday first, in the language now being read. */
+export const weekdayInitials = () => WEEKDAYS[locale];
+
 /* A narrow no-break space, which is what French groups thousands with. Written as an escape because
    the character itself is invisible in a diff. */
 const NBSP = '\u00A0';

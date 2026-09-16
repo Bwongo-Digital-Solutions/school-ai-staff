@@ -22,6 +22,15 @@ export const en = {
   'common.notConfigured': 'Not configured',
   'common.somethingWrong': 'Something went wrong.',
 
+  /* ------------------------------------------------------------------------ the date picker -- */
+  /* The month names and weekday initials are not here: they live in format.js beside the short
+     forms the rest of the app already prints, so a date reads the same wherever it appears. */
+  'date.choose': 'Choose a date',
+  'date.month': 'Month',
+  'date.year': 'Year',
+  'date.today': 'Today',
+  'date.clear': 'Clear',
+
   /* ------------------------------------------------------------------------------- the tabs -- */
   'tab.home': 'Home',
   'tab.scan': 'Scan',

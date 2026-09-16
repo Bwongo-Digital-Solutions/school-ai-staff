@@ -26,6 +26,8 @@ import Button from '../components/Button';
 import Select from '../components/Select';
 import ScreenHeader from '../components/ScreenHeader';
 import Field, { FormError } from '../components/Field';
+import DateField from '../components/DateField';
+import { todayIso } from '../format';
 import { alertSuccess, alertError, alertWarning } from '../alerts';
 
 const GRADES = [7, 8, 9, 10, 11, 12, 13];
@@ -257,12 +259,13 @@ export default function RegisterStudentScreen({ user, onRegistered, onBack }) {
             onChange={set('gender')}
             options={GENDERS}
           />
-          <Field
+          {/* A birth date is the value every report card this child receives is printed
+              against, and it was the one field typed blind on a numeric keypad. */}
+          <DateField
             label="Date of birth"
             value={form.dateOfBirth}
-            onChangeText={set('dateOfBirth')}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
+            onChange={set('dateOfBirth')}
+            maxIso={todayIso()}
           />
 
           {/* Clubs. A student joins any number; a full one cannot be chosen at all, which is a
