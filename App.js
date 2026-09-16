@@ -53,6 +53,10 @@ const RECENT_LIMIT = 6;
    server with a request per staff phone per few seconds. */
 const INBOX_POLL_MS = 60000;
 
+/* The roster, emptied. Named alongside the others because ending a session has to put it back —
+   leaving one school's children in memory for whoever signs in next is not a thing to do by
+   omission. */
+const EMPTY_SCHOOL = { students: [], fees: [] };
 const EMPTY_INBOX = { messages: [], unread: 0, loaded: false, error: '' };
 const EMPTY_PENDING_GATE = { rows: [], count: 0, loaded: false };
 const EMPTY_CHAT = {
@@ -96,6 +100,11 @@ function Root() {
 
   const [booted, setBooted] = useState(false);
   const [user, setUser] = useState(null);
+  /* Why the login screen is being shown, when there is a reason worth saying. A session that ran
+     out is not the same as never having signed in, and a teacher who is suddenly asked for a
+     password deserves to know which. Held as a flag rather than as a sentence so that switching
+     language re-renders it translated instead of leaving yesterday's wording on screen. */
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [apiBase, setApiBase] = useState('');
   const [recent, setRecent] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -197,7 +206,7 @@ function Root() {
     }
   }, []);
 
-  const [school, setSchool] = useState({ students: [], fees: [] });
+  const [school, setSchool] = useState(EMPTY_SCHOOL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const loadedRef = useRef(false);
@@ -240,7 +249,24 @@ function Root() {
       if (cancelled) return;
       setApiBase(base);
       setRecent(storedRecent);
-      if (storedUser && base) setUser(storedUser);
+
+      /* A stored user without a stored token is not a signed-in person.
+       *
+       * Two ways to arrive here. A phone updating from a build older than 2292ddf has a user in
+       * storage and no token at all — that release is where the token began being kept, because
+       * before it the app relied on a cookie React Native's fetch never stored. And `setToken('')`
+       * can have cleared the token on a 401 while the user object stayed behind.
+       *
+       * Either way, restoring the user would draw a signed-in app around a credential that does
+       * not exist: every read refused, an empty roster, and no way out that anybody would guess
+       * except signing out and back in. Better to ask for the sign-in that is actually needed. */
+      if (storedUser && base && !api.token()) {
+        AsyncStorage.removeItem(STORAGE.user).catch(() => {});
+        setSessionEnded(true);
+      } else if (storedUser && base) {
+        setUser(storedUser);
+      }
+
       setBooted(true);
       if (base) refreshBranding();
     })();
@@ -408,8 +434,58 @@ function Root() {
     setTab('home');
   }, []);
 
+  /**
+   * Put the app back to nobody-signed-in.
+   *
+   * Everything a session owns, in one place, because there are two ways out of one and they must
+   * leave exactly the same state behind: signing out by hand, and the server refusing the token.
+   * The roster in particular — leaving one school's children in memory for whoever signs in next
+   * is not a thing to do by omission.
+   *
+   * Does not touch the token or stored user: the two callers differ on those and say so.
+   */
+  const clearSession = useCallback(() => {
+    loadedRef.current = false;
+    stackRef.current = [];
+    setStack([]);
+    setTab('home');
+    setSchool(EMPTY_SCHOOL);
+    setOverview(null);
+    setError('');
+    setInbox(EMPTY_INBOX);
+    setPendingGate(EMPTY_PENDING_GATE);
+    setChat(EMPTY_CHAT);
+    setGateAction(null);
+    setGateCard(null);
+    setRollClass(null);
+    setRollPinned(null);
+    setUser(null);
+  }, []);
+
+  /**
+   * The server has refused the session this phone was carrying.
+   *
+   * Sessions last SESSION_TTL_HOURS — twelve by default — so for anybody who uses the app two days
+   * running this is a daily event, not an edge case. What happened before was that every read came
+   * back refused and the app went on drawing a signed-in shell around an empty roster and a Retry
+   * button that could only fail again. The only escape was to sign out and back in, which is a
+   * thing to have discovered rather than a thing to be told.
+   *
+   * api.js has already dropped the token by the time this runs, so this clears the rest and says
+   * why on the login screen.
+   */
+  useEffect(() => {
+    api.setUnauthorizedHandler(() => {
+      AsyncStorage.removeItem(STORAGE.user).catch(() => {});
+      clearSession();
+      setSessionEnded(true);
+    });
+    return () => api.setUnauthorizedHandler(null);
+  }, [clearSession]);
+
   const handleSignedIn = useCallback((nextUser) => {
     AsyncStorage.setItem(STORAGE.user, JSON.stringify(nextUser)).catch(() => {});
+    setSessionEnded(false);
     refreshBranding();
     loadedRef.current = false;
     stackRef.current = [];
@@ -425,22 +501,10 @@ function Root() {
     AsyncStorage.removeItem(STORAGE.user).catch(() => {});
     // The session goes with the account; otherwise the next person to sign in inherits it.
     api.setToken('').catch(() => {});
-    loadedRef.current = false;
-    stackRef.current = [];
-    setStack([]);
-    setTab('home');
-    setSchool({ students: [], fees: [] });
-    setOverview(null);
-    setError('');
-    setInbox(EMPTY_INBOX);
-    setPendingGate(EMPTY_PENDING_GATE);
-    setChat(EMPTY_CHAT);
-    setGateAction(null);
-    setGateCard(null);
-    setRollClass(null);
-    setRollPinned(null);
-    setUser(null);
-  }, []);
+    // Chosen, not imposed — so the login screen has nothing to explain.
+    setSessionEnded(false);
+    clearSession();
+  }, [clearSession]);
 
   const handleSettingsSaved = useCallback(
     (base) => {
@@ -559,6 +623,7 @@ function Root() {
         {statusBar}
         <LoginScreen
           apiBase={apiBase}
+          sessionEnded={sessionEnded}
           onSignedIn={handleSignedIn}
           onOpenSettings={() => setSettingsOpen(true)}
         />

@@ -171,8 +171,16 @@ export const flush = async (send) => {
       sent += 1;
     } catch (error) {
       const status = Number(error && error.status);
-      if (!status) {
-        // Still no way through. Keep it, and everything behind it, in order.
+      /* No way through, or no longer signed in. Keep it, and everything behind it, in order.
+       *
+       * 401 belongs here rather than below, and it is the one refusal the rule below gets wrong:
+       * every other status is the server having an opinion about the work, which retrying will not
+       * change — but 401 is an opinion about the *session*, and signing in again changes it. It is
+       * also routine, because a session lasts twelve hours by default. Discarding here meant a
+       * teacher who registered a child at a gate with no signal, and whose session then ran out
+       * before the signal returned, lost the registration — which is the exact failure this queue
+       * exists to prevent. */
+      if (!status || status === 401) {
         entry.attempts += 1;
         entry.lastError = String((error && error.message) || '');
         offline = true;

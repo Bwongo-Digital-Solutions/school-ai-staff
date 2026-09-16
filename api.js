@@ -26,6 +26,17 @@ let baseUrl = DEFAULT_BASE;
    bearer credential. It is one token either way, with the same signature, tenant and expiry. */
 let sessionToken = '';
 
+/* Told when the server says this session is no longer one.
+ *
+ * Sessions last SESSION_TTL_HOURS — twelve by default — so this fires for every teacher roughly
+ * once a day. Until now nothing listened: the token quietly stopped working, every read came back
+ * refused, and the app went on drawing a signed-in shell around an empty roster and a Retry button
+ * that could only fail. The only way out anyone found was to sign out and back in, which is a
+ * thing to have discovered rather than a thing to be told.
+ *
+ * Registered by App.js, which ends the session properly and says why. */
+let onUnauthorized = null;
+
 /* A bare host, or `host:port`, is what people actually type. React Native's
    fetch rejects a URL with no scheme outright, and that surfaces as the same
    "cannot reach the server" as a wrong address, so the scheme is filled in
@@ -69,6 +80,10 @@ export const api = {
   },
   token() {
     return sessionToken;
+  },
+  /** Registered once by App.js. See `onUnauthorized` above for what it is for. */
+  setUnauthorizedHandler(fn) {
+    onUnauthorized = typeof fn === 'function' ? fn : null;
   },
   async setBase(url) {
     const clean = normaliseBase(url);
@@ -134,6 +149,9 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeout);
+  // Read before the request rather than after: sign-out can clear the token while this is in
+  // flight, and a 401 that arrives then must not be read as "the session we sent has expired".
+  const sentToken = sessionToken;
   let res;
   try {
     res = await fetch(baseUrl + path, {
@@ -168,6 +186,25 @@ async function request(path, init, { timeout = TIMEOUT } = {}) {
     payload = await res.json();
   } catch {
     /* non-JSON error page */
+  }
+
+  /* The session we sent has been refused, so it is not a session any more.
+   *
+   * Only when a token actually went out with this request: a 401 from signing in is a wrong
+   * password, not an expired session, and treating the two alike would bounce somebody off the
+   * login screen they are standing on.
+   *
+   * The token is dropped here rather than left for the handler, so every request already queued
+   * behind this one stops presenting a credential the server has just rejected. */
+  if (res.status === 401 && sentToken) {
+    await api.setToken('');
+    if (onUnauthorized) {
+      try {
+        onUnauthorized();
+      } catch {
+        /* the app's own handler; never let it turn an expired session into a crash */
+      }
+    }
   }
 
   if (!res.ok || (payload && payload.error)) {

@@ -320,6 +320,9 @@ export const fr = {
   'date.year': 'Année',
   "date.today": "Aujourd'hui",
   'date.clear': 'Effacer',
+
+  /* ------------------------------------------------------------------------ signing in ----- */
+  'auth.sessionEnded': 'Votre session a expiré. Veuillez vous reconnecter.',
 };
 
 export default fr;

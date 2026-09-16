@@ -43,6 +43,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The four scripts that exercise logic rather than imports. They were written to be run
+      # and then nothing ran them: this workflow bundled the app and stopped, so a catalogue
+      # could drift, a version comparison could invert, a calendar could put the 1st under the
+      # wrong weekday and a queued registration could be thrown away, all with CI green.
+      #
+      # They cost about a second between them, need nothing but node_modules, and each one
+      # covers a decision the bundle below cannot see — Metro only proves the file parses.
+      #
+      # check-dates runs twice, in two timezones. The UTC-shift assertion cannot fail in a UTC
+      # runner, which is exactly the case it exists for; Kampala is where it bites.
+      - name: Check the logic that bundling cannot see
+        run: |
+          node scripts/check-locales.mjs
+          node scripts/check-update.mjs
+          node scripts/check-dates.mjs
+          TZ=Africa/Kampala node scripts/check-dates.mjs
+          node scripts/check-outbox.mjs
+
       # Turns app.json into a native project. Catches a malformed android block or a
       # config plugin that cannot resolve — neither of which the bundle below would see.
       - name: Generate native Android project

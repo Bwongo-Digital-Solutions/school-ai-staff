@@ -302,6 +302,9 @@ export const en = {
   'sync.retry': 'Try now',
   'sync.queued': 'Saved on this phone',
   'sync.queuedDetail': 'No network just now. It will be sent when the signal comes back.',
+
+  /* ------------------------------------------------------------------------ signing in ----- */
+  'auth.sessionEnded': 'Your session has ended. Please sign in again.',
 };
 
 export default en;
