@@ -34,7 +34,7 @@ import { schoolApi, ApiError, receiptUrl, broadsheetUrl } from '../api';
 import { printDocument } from '../share';
 import { decideGatePass, gateFailureText } from '../gate';
 import { canPrintDocuments, designationOf } from '../roles';
-import { dateTime, formatDate, humanise, money } from '../format';
+import { dateTime, formatDate, humanise, money, todayIso } from '../format';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
@@ -46,6 +46,7 @@ import PermissionSlip from '../components/PermissionSlip';
 import MovementList from '../components/MovementList';
 import StudentHeader from '../components/StudentHeader';
 import Field, { FormError } from '../components/Field';
+import DateField from '../components/DateField';
 import { alertSuccess, alertWarning, alertError } from '../alerts';
 import { shareDocument } from '../share';
 
@@ -1255,12 +1256,13 @@ function GatePermissionSection({ card, user, reload }) {
           editable={!busy}
           style={styles.formField}
         />
-        <Field
+        {/* A return date is always today or later, so the calendar will not offer a day in
+            the past — a gate pass expiring before it is issued is not a real answer. */}
+        <DateField
           label="Expected back (optional)"
           value={expectedReturn}
-          onChangeText={setExpectedReturn}
-          placeholder="YYYY-MM-DD"
-          autoCapitalize="none"
+          onChange={setExpectedReturn}
+          minIso={todayIso()}
           editable={!busy}
           style={styles.formField}
         />

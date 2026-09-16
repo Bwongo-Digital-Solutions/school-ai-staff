@@ -313,6 +313,13 @@ export const fr = {
   'sync.retry': 'Essayer maintenant',
   'sync.queued': 'Enregistré sur ce téléphone',
   'sync.queuedDetail': "Pas de réseau pour le moment. L'envoi se fera au retour du signal.",
+
+  /* ------------------------------------------------------------------------ the date picker -- */
+  'date.choose': 'Choisir une date',
+  'date.month': 'Mois',
+  'date.year': 'Année',
+  "date.today": "Aujourd'hui",
+  'date.clear': 'Effacer',
 };
 
 export default fr;
