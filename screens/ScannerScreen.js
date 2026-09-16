@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   Animated,
   AppState,
@@ -18,6 +17,7 @@ import { QrCode, Keyboard, CameraSlash, Flashlight } from 'phosphor-react-native
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { schoolApi, ApiError, parseStudentCode } from '../api';
 import { designationOf } from '../roles';
+import Screen from '../components/Screen';
 import Button from '../components/Button';
 import ScreenHeader from '../components/ScreenHeader';
 
@@ -179,7 +179,7 @@ export default function ScannerScreen({
   useEffect(() => () => setTorch(false), []);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       {onBack ? (
         <ScreenHeader title={TITLES[intent] || TITLES.card} onBack={onBack} />
       ) : (
@@ -340,7 +340,7 @@ export default function ScannerScreen({
           />
         </View>
       ) : null}
-    </SafeAreaView>
+    </Screen>
   );
 }
 

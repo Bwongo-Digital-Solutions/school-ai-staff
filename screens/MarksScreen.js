@@ -14,7 +14,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   TextInput,
@@ -31,6 +30,7 @@ import { useTheme, spacing, fonts, type } from '../theme';
 import { schoolApi, broadsheetUrl, ApiError } from '../api';
 import { printDocument } from '../share';
 import { canPrintDocuments } from '../roles';
+import Screen from '../components/Screen';
 import Button from '../components/Button';
 import Select from '../components/Select';
 import StateBlock from '../components/StateBlock';
@@ -243,7 +243,7 @@ export default function MarksScreen({ user, onBack }) {
 
   if (camera) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <Screen style={styles.safe}>
         <ScreenHeader title={t('marks.photographTitle')} onBack={() => setCamera(false)} />
         <View style={styles.cameraWrap}>
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
@@ -254,14 +254,14 @@ export default function MarksScreen({ user, onBack }) {
           </Text>
           <Button label={t('marks.takePicture')} icon={Camera} variant="primary" onPress={takePhoto} />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   const needsReview = (proposal?.rows || []).filter((row) => row.needs_review).length;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title={t('marks.title')} onBack={onBack} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -424,7 +424,7 @@ export default function MarksScreen({ user, onBack }) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

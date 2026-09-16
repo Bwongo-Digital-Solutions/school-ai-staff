@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { ChatCircleDots, PencilSimple, Prohibit, SignOut, WarningCircle } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi } from '../api';
@@ -7,6 +7,7 @@ import { decideGatePass } from '../gate';
 import { audienceLabel } from '../roles';
 import { useT } from '../i18n';
 import { dateTime, humanise } from '../format';
+import Screen from '../components/Screen';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import StateBlock from '../components/StateBlock';
@@ -123,7 +124,7 @@ export default function MessagesScreen({
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader
         title="Notifications"
         onBack={onBack}
@@ -214,7 +215,7 @@ export default function MessagesScreen({
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

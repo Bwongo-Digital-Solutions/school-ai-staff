@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { Platform, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const THEME_KEY = 'kps.theme';
@@ -103,6 +104,23 @@ export const spacing = {
   xxl: 22,
 };
 
+/**
+ * How far the top of a screen has to start below the edge of the display.
+ *
+ * `expo-status-bar` draws the Android status bar transparent and lets the app paint underneath it —
+ * `translucent` defaults to true, and with no `backgroundColor` the background becomes
+ * `'transparent'` (see `ExpoStatusBar.android.js`). Nothing in this app was putting that space
+ * back: every screen wrapped itself in `SafeAreaView` from react-native, which is iOS-only and
+ * contributes nothing on Android.
+ *
+ * Measured rather than guessed. `StatusBar.currentHeight` is the real height on this handset, which
+ * is not one number — a punch-hole camera, a larger display cutout and a tall-status-bar skin all
+ * give different answers, and a constant chosen here would be wrong on most of them.
+ *
+ * `?? 0` for iOS, where the value is undefined and `SafeAreaView` does the job properly itself.
+ */
+export const screenTopInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
 export const radius = {
   sm: 4,
   md: 8,
@@ -172,4 +190,4 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-export default { palettes, spacing, radius, fonts, type, ThemeProvider, useTheme };
+export default { palettes, spacing, radius, screenTopInset, fonts, type, ThemeProvider, useTheme };

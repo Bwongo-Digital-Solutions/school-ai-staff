@@ -5,7 +5,6 @@ import {
   Switch,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { schoolApi } from '../api';
 import { audienceLabel } from '../roles';
 import { useT } from '../i18n';
 import { humanise } from '../format';
+import Screen from '../components/Screen';
 import Button from '../components/Button';
 import StateBlock from '../components/StateBlock';
 import ScreenHeader from '../components/ScreenHeader';
@@ -135,7 +135,7 @@ export default function ComposeScreen({ user, onSent, onBack }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title="New message" onBack={onBack} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -224,7 +224,7 @@ export default function ComposeScreen({ user, onSent, onBack }) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

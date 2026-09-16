@@ -10,7 +10,7 @@
    "sent to the parent", and the log records the same distinction. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { CheckSquare, Square, Export, EnvelopeSimple, Printer } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts, type } from '../theme';
@@ -18,6 +18,7 @@ import { schoolApi, reportUrl, reportCardUrl, ApiError } from '../api';
 import { shareDocument, printDocument } from '../share';
 import { alertSuccess, alertError } from '../alerts';
 import { classOf, dateTime } from '../format';
+import Screen from '../components/Screen';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -191,7 +192,7 @@ export default function ReportScreen({ card, user, onBack }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title={t('report.title')} onBack={onBack} />
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
@@ -324,7 +325,7 @@ export default function ReportScreen({ card, user, onBack }) {
           {error ? <FormError message={error} /> : null}
         </Card>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

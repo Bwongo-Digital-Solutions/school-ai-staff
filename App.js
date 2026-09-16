@@ -9,7 +9,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { ThemeProvider, useTheme } from './theme';
+import { ThemeProvider, screenTopInset, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError, flushOutbox } from './api';
 import { onPendingChange } from './outbox';
@@ -843,6 +843,11 @@ const createStyles = (colors) =>
     root: {
       flex: 1,
       backgroundColor: colors.bg,
+      /* Held clear of the status bar here rather than on each screen, because the update and
+         sync banners are drawn above the screen — an inset applied per-screen would leave those
+         two under the clock and put a second gap beneath them. This is the window's root, so it
+         is the one place the overlap actually happens. See `screenTopInset` in theme.js. */
+      paddingTop: screenTopInset,
     },
     flex: {
       flex: 1,

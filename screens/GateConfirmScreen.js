@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Check, SealCheck, SignIn, SignOut, WarningCircle, X } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { decideGatePass, gateFailureText } from '../gate';
 import { formatDate } from '../format';
+import Screen from '../components/Screen';
 import Button from '../components/Button';
 import ScreenHeader from '../components/ScreenHeader';
 import PermissionSlip from '../components/PermissionSlip';
@@ -116,7 +117,7 @@ export default function GateConfirmScreen({
     : [];
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen style={styles.safe}>
       <ScreenHeader title={action.label} onBack={onBack || onCancel} />
       <ScrollView
         style={styles.flex}
@@ -211,7 +212,7 @@ export default function GateConfirmScreen({
           style={styles.actionTight}
         />
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
