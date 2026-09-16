@@ -11,14 +11,16 @@ import {
 } from 'react-native';
 import { GraduationCap, Cloud } from 'phosphor-react-native';
 import { useTheme, radius, spacing, fonts, type } from '../theme';
+import { useT } from '../i18n';
 import { useBranding } from '../branding';
 import { APP_FOOTER } from '../version';
 import { alertSuccess, alertError } from '../alerts';
 import { schoolApi, ApiError } from '../api';
 import Button from '../components/Button';
 
-export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
+export default function LoginScreen({ apiBase, sessionEnded, onSignedIn, onOpenSettings }) {
   const { colors } = useTheme();
+  const { t } = useT();
   const { name: schoolName, tagline, logo, isDefaultLogo } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -189,6 +191,13 @@ export default function LoginScreen({ apiBase, onSignedIn, onOpenSettings }) {
             returnKeyType="go"
           />
 
+          {/* Why they are looking at this screen, when there is a reason. A session that ran out
+              is not the same as never having signed in, and without this the password box simply
+              appears one morning with no explanation. Cleared the moment they sign in. */}
+          {sessionEnded && !error ? (
+            <Text style={styles.notice}>{t('auth.sessionEnded')}</Text>
+          ) : null}
+
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Button
@@ -284,6 +293,15 @@ const createStyles = (colors) =>
       fontFamily: fonts.regular,
       fontSize: 13,
       color: colors.status.red,
+      marginTop: spacing.lg,
+      textAlign: 'center',
+    },
+    /* Not red. A session running out is the ordinary course of events, not a fault the teacher
+       committed, and colouring it like a failed password would say otherwise. */
+    notice: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.neutral[400],
       marginTop: spacing.lg,
       textAlign: 'center',
     },
