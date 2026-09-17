@@ -127,14 +127,25 @@ export default function LoginScreen({ apiBase, sessionEnded, onSignedIn, onOpenS
             <Text style={styles.fieldLabel}>Code from your authenticator app</Text>
             <TextInput
               value={code}
-              onChangeText={setCode}
+              /* Keep only digits. An authenticator or a password manager filling this field hands
+                 over what it displays, which is often "123 456" with the readability space in it —
+                 six digits the server would then reject as seven characters. Stripping here means
+                 an autofilled code and a typed one arrive the same. */
+              onChangeText={(next) => setCode(String(next).replace(/\D/g, '').slice(0, 6))}
               style={styles.input}
               placeholder="000000"
               placeholderTextColor={colors.neutral[600]}
-              /* A numeric pad rather than a full keyboard, and one-time-code so the phone offers
-                 the digits it has just shown in a notification. */
+              /* A numeric pad rather than a full keyboard, and the autofill hint each platform
+                 actually reads.
+                 `one-time-code` is the iOS value; on Android it is not a recognised hint at all, so
+                 the field this screen is built around had no autofill on the platform this app
+                 ships to. Android's hint is `sms-otp`, and it is what the autofill framework and
+                 every password manager that stores a TOTP offer a code on — the name says SMS, the
+                 behaviour is "this is a one-time code". `importantForAutofill` is what makes the
+                 field eligible in the first place. */
               keyboardType="number-pad"
-              autoComplete="one-time-code"
+              autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+              importantForAutofill="yes"
               textContentType="oneTimeCode"
               maxLength={6}
               autoFocus
