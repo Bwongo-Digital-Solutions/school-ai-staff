@@ -583,6 +583,16 @@ export const schoolApi = {
   markAllMessagesRead: ({ actorEmail }) =>
     post('/api/functions/messages', { action: 'read_all', actorEmail }),
 
+  /**
+   * The gate, as it stands right now.
+   *
+   * The same endpoint the web board reads, so the two cannot disagree about how many children are
+   * on the premises. The phone has no event stream, so this is polled while the board is open and
+   * the app is in front — see GateBoardScreen for why that is a poll rather than a socket.
+   */
+  gateBoard: (limit = 25) =>
+    post('/api/functions/gate-board', { limit }),
+
   rollCallClasses: () =>
     post('/api/functions/roll-call', { action: 'classes' }).then((d) => (d && d.classes) || []),
 

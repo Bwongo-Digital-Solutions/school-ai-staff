@@ -103,6 +103,18 @@ const DOCUMENT_ROLES = ['admin', 'teacher'];
 export const canPrintDocuments = (user) => !!user && DOCUMENT_ROLES.includes(user.role);
 
 /**
+ * May watch the gate: the office, and the gate itself.
+ *
+ * The twin of GATE_ROLES in the server's `auth/roles.mjs`, and written out here for the same
+ * reason the list above is — the server refuses the route regardless, and this only decides
+ * whether the app draws a way in. A teacher is not on it: the board carries a child's name and
+ * the fact they left the premises, and that is not a teacher's business.
+ */
+const GATE_ROLES = ['admin', 'head_teacher', 'support_staff'];
+
+export const canWatchGate = (user) => !!user && GATE_ROLES.includes(user.role);
+
+/**
  * Which feature each tab belongs to, mirroring the registry in server/licensing/plans.mjs.
  *
  * `home` and `profile` are absent on purpose, and not by oversight. Home is where a teacher lands and

@@ -16,7 +16,7 @@ import {
 import { useTheme, radius, spacing, fonts, type } from '../theme';
 import { useBranding } from '../branding';
 import { schoolApi } from '../api';
-import { amount, money, percent, todayIso } from '../format';
+import { amount, money, percent } from '../format';
 import {
   canRegisterStudents, featureOn, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey,
 } from '../roles';
@@ -109,6 +109,7 @@ export default function HomeScreen({
   onOpenRollCall,
   onStartGateAction,
   onOpenPendingGate,
+  onOpenGateBoard,
   onOpenMatron,
 }) {
   const { colors, toggleTheme } = useTheme();
@@ -217,7 +218,7 @@ export default function HomeScreen({
                   />
                   <GateActions onStart={onStartGateAction} styles={styles} />
                   {/* The gate's own board: today's traffic, without scanning anyone. */}
-                  <GateLog styles={styles} />
+                  <GateLog styles={styles} onOpenBoard={onOpenGateBoard} />
                 </>
               ) : (
                 <StateBlock message={t(scanPurposeKey(user))} style={styles.supportHint} />
@@ -347,8 +348,9 @@ function GateActions({ onStart, styles }) {
   );
 }
 
-function GateLog({ styles }) {
-  const [log, setLog] = useState(null);
+function GateLog({ styles, onOpenBoard }) {
+  const { t } = useT();
+  const [board, setBoard] = useState(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
 
@@ -357,11 +359,11 @@ function GateLog({ styles }) {
   useEffect(() => {
     let cancelled = false;
     setError('');
-    setLog(null);
+    setBoard(null);
     schoolApi
-      .gateLog({ date: todayIso(), limit: 60 })
+      .gateBoard(30)
       .then((next) => {
-        if (!cancelled) setLog(next);
+        if (!cancelled) setBoard(next);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -373,32 +375,49 @@ function GateLog({ styles }) {
 
   return (
     <>
-      <SectionLabel>Today at the gate</SectionLabel>
+      <SectionLabel>{t('gate.today')}</SectionLabel>
       {error ? (
         <StateBlock kind="error" message={error} onRetry={reload} />
-      ) : !log ? (
-        <StateBlock kind="loading" message="Loading the gate log…" />
+      ) : !board ? (
+        <StateBlock kind="loading" message={t('gate.loading')} />
       ) : (
         <>
+          {/* People, not punches — and the same three figures the full board and the web board
+              show, off the same endpoint. This card used to count movements out/in/declined from
+              `gateLog`, which answers a different question with the same words: a child who steps
+              out and back in was two, and "on the premises" could not be asked at all. Two gate
+              figures that disagree is a support call. */}
           <CountsRow
             counts={[
-              [log.counts.out, 'Out'],
-              [log.counts.in, 'In'],
-              [log.counts.declined, 'Declined'],
+              [board.totals.on_site, t('gate.onSite')],
+              [board.totals.checked_in, t('gate.checkedIn')],
+              [board.totals.checked_out, t('gate.checkedOut')],
             ]}
           />
-          {!log.movements.length ? (
-            <StateBlock message="Nobody has passed the gate today." />
+          {!board.recent.length ? (
+            <StateBlock message={t('gate.noMovements')} />
           ) : (
             <Card style={styles.listCard}>
-              <MovementList movements={log.movements} />
+              <MovementList
+                movements={board.recent
+                  .slice(0, 6)
+                  .map((row) => ({ ...row, full_name: row.student_name }))}
+              />
             </Card>
           )}
+          {/* The card shows the last few; the board shows the day and keeps itself current. */}
+          <Button
+            label={t('gate.openBoard')}
+            variant="secondary"
+            onPress={onOpenBoard}
+            style={styles.rollCallButton}
+          />
         </>
       )}
     </>
   );
 }
+
 
 const createStyles = (colors) =>
   StyleSheet.create({
