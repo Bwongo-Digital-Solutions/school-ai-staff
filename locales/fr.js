@@ -323,6 +323,21 @@ export const fr = {
 
   /* ------------------------------------------------------------------------ signing in ----- */
   'auth.sessionEnded': 'Votre session a expiré. Veuillez vous reconnecter.',
+  'gate.title': 'Le portail',
+  'gate.onSite': 'Sur le site',
+  'gate.checkedIn': 'Entrés',
+  'gate.checkedOut': 'Sortis',
+  'gate.movements': 'Passages',
+  'gate.noMovements': 'Personne n’a encore franchi le portail aujourd’hui.',
+  'gate.cameIn': 'entré',
+  'gate.wentOut': 'sorti',
+  'gate.turnedBackOne': 'refoulé',
+  'gate.turnedBackCount': { one: '{count} élève a été refoulé aujourd’hui.', other: '{count} élèves ont été refoulés aujourd’hui.' },
+  'gate.today': 'Aujourd’hui au portail',
+  'gate.openBoard': 'Ouvrir le tableau du portail',
+  'gate.loading': 'Lecture du portail…',
+  'gate.loadFailed': 'Impossible de lire le portail.',
+  'home.gate': 'Le portail',
 };
 
 export default fr;

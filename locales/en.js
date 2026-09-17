@@ -305,6 +305,21 @@ export const en = {
 
   /* ------------------------------------------------------------------------ signing in ----- */
   'auth.sessionEnded': 'Your session has ended. Please sign in again.',
+  'gate.title': 'The gate',
+  'gate.onSite': 'On site',
+  'gate.checkedIn': 'Came in',
+  'gate.checkedOut': 'Went out',
+  'gate.movements': 'Movements',
+  'gate.noMovements': 'Nobody has passed the gate yet today.',
+  'gate.cameIn': 'came in',
+  'gate.wentOut': 'went out',
+  'gate.turnedBackOne': 'turned back',
+  'gate.turnedBackCount': { one: '{count} student was turned back today.', other: '{count} students were turned back today.' },
+  'gate.today': 'Today at the gate',
+  'gate.openBoard': 'Open the gate board',
+  'gate.loading': 'Reading the gate…',
+  'gate.loadFailed': 'Could not read the gate.',
+  'home.gate': 'The gate',
 };
 
 export default en;

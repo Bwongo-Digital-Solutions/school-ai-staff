@@ -30,6 +30,7 @@ import UpdateBanner from './components/UpdateBanner';
 import SyncBanner from './components/SyncBanner';
 import { checkForUpdate, dismissUpdate } from './update';
 import PendingGateScreen from './screens/PendingGateScreen';
+import GateBoardScreen from './screens/GateBoardScreen';
 import RegisterStudentScreen from './screens/RegisterStudentScreen';
 import MatronScreen from './screens/MatronScreen';
 import MarksScreen from './screens/MarksScreen';
@@ -681,6 +682,7 @@ function Root() {
             pendingGateCount={pendingGate.count}
             pendingGateLoaded={pendingGate.loaded}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
+            onOpenGateBoard={() => push({ name: 'gateboard' })}
             onOpenMatron={() => push({ name: 'matron' })}
             onRegisterStudent={() => push({ name: 'register' })}
             onRecordMarks={() => push({ name: 'marks' })}
@@ -758,6 +760,10 @@ function Root() {
           <PendingGateScreen user={user} onBack={pop} />
         )}
 
+        {route.name === 'gateboard' && (
+          <GateBoardScreen onBack={pop} />
+        )}
+
         {route.name === 'matron' && (
           <MatronScreen user={user} onBack={pop} />
         )}
@@ -811,6 +817,7 @@ function Root() {
             onReload={() => refreshInbox({ quiet: false })}
             onCompose={() => push({ name: 'compose' })}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
+            onOpenGateBoard={() => push({ name: 'gateboard' })}
             onBack={pop}
           />
         )}
