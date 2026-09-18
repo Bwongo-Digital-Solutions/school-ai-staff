@@ -182,6 +182,10 @@ export const fr = {
 
   /* ── a whole class's documents ──────────────────────────────────────────── */
   /* ── saisie des notes ───────────────────────────────────────────────────── */
+  'marks.progress': '{marked} sur {total} notés',
+  'marks.stillToMark': { one: '{count} reste à noter', other: '{count} restent à noter' },
+  'marks.allMarked': 'toute la classe est notée',
+  'marks.outOf': 'sur {max}',
   'marks.title': 'Saisir des notes',
   'marks.loadingClasses': 'Chargement de vos classes…',
   'marks.noClasses':

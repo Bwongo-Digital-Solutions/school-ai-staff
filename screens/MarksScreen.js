@@ -57,6 +57,7 @@ export default function MarksScreen({ user, onBack }) {
   const [classes, setClasses] = useState(null);
   const [chosen, setChosen] = useState('');
   const [students, setStudents] = useState([]);
+  const [saved, setSaved] = useState({});
   const [scores, setScores] = useState({});
   const [proposal, setProposal] = useState(null);
   const [error, setError] = useState('');
@@ -94,6 +95,10 @@ export default function MarksScreen({ user, onBack }) {
         if (student.score !== null && student.score !== undefined) existing[student.id] = String(student.score);
       });
       setScores(existing);
+      /* The same values kept aside, untouched, as the record of what the server already holds.
+         Without this the screen could not tell a mark it loaded from a mark the teacher typed —
+         which is why the Save button used to offer to save the whole class after one entry. */
+      setSaved(existing);
     } catch (err) {
       setError(err.message);
       setStudents([]);
@@ -167,10 +172,23 @@ export default function MarksScreen({ user, onBack }) {
         .filter((row) => row.student_id && row.score !== null && row.score !== undefined && row.score !== '')
         .map((row) => ({ studentId: row.student_id, score: row.score, maxScore: row.max_score }));
     }
+    /* Only what differs from what the server already holds. It used to be everything non-empty,
+       and because the roster seeds the boxes with the marks that exist, a teacher who typed one
+       mark was shown "Save 40 marks" and re-wrote the other thirty-nine unchanged. The button now
+       counts the work that is actually outstanding, which is the number worth showing. */
     return students
       .map((student) => ({ studentId: student.id, score: scores[student.id] }))
-      .filter((row) => String(row.score ?? '').trim() !== '');
-  }, [proposal, students, scores]);
+      .filter((row) => String(row.score ?? '').trim() !== ''
+        && String(row.score).trim() !== String(saved[row.studentId] ?? '').trim());
+  }, [proposal, students, scores, saved]);
+
+  /* What is left to do, for the line above the list. Counted off the stored marks rather than the
+     boxes, so it answers "has this class been marked" and not "has anything been typed". */
+  const progress = useMemo(() => {
+    const total = students.length;
+    const marked = students.filter((student) => String(saved[student.id] ?? '').trim() !== '').length;
+    return { total, marked, unmarked: total - marked };
+  }, [students, saved]);
 
   const save = async () => {
     if (!pending.length) {
@@ -381,19 +399,60 @@ export default function MarksScreen({ user, onBack }) {
                   ) : busy === 'roster' ? (
                     <StateBlock kind="loading" message={t('marks.loadingClass')} />
                   ) : (
-                    students.map((student) => (
-                      <View key={student.id} style={styles.row}>
-                        <Text style={styles.name} numberOfLines={1}>{student.full_name}</Text>
-                        <TextInput
-                          value={scores[student.id] ?? ''}
-                          onChangeText={(value) => setScores((prev) => ({ ...prev, [student.id]: value }))}
-                          keyboardType="numeric"
-                          placeholder="—"
-                          placeholderTextColor={colors.neutral[500]}
-                          style={styles.scoreInput}
-                        />
-                      </View>
-                    ))
+                    <>
+                      {/* What is left to do, before the list rather than after it. A teacher opening
+                          a class they marked last week should be able to see that in one line
+                          instead of scrolling forty rows to find out. */}
+                      {progress.total > 0 ? (
+                        <View style={styles.progress}>
+                          <Text style={styles.progressCount}>
+                            {t('marks.progress', { marked: progress.marked, total: progress.total })}
+                          </Text>
+                          <Text style={progress.unmarked > 0 ? styles.progressLeft : styles.progressDone}>
+                            {progress.unmarked > 0
+                              ? t('marks.stillToMark', { count: progress.unmarked })
+                              : t('marks.allMarked')}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {students.map((student) => {
+                        const typed = String(scores[student.id] ?? '').trim();
+                        const stored = String(saved[student.id] ?? '').trim();
+                        /* Three states, and the row shows which: nothing recorded, a stored mark
+                           standing as it was, and a stored mark the teacher has just changed. The
+                           last is the one that must be obvious — it is the work the Save button is
+                           about to write. */
+                        const changed = typed !== '' && typed !== stored;
+                        const blank = typed === '';
+
+                        return (
+                          <View
+                            key={student.id}
+                            style={[
+                              styles.row,
+                              blank && styles.rowBlank,
+                              changed && styles.rowChanged,
+                            ]}
+                          >
+                            <Text style={styles.name} numberOfLines={1}>{student.full_name}</Text>
+                            {student.max_score ? (
+                              <Text style={styles.outOf}>{t('marks.outOf', { max: student.max_score })}</Text>
+                            ) : null}
+                            <TextInput
+                              value={scores[student.id] ?? ''}
+                              onChangeText={(value) => setScores((prev) => ({ ...prev, [student.id]: value }))}
+                              keyboardType="numeric"
+                              placeholder="—"
+                              placeholderTextColor={colors.neutral[500]}
+                              style={[styles.scoreInput, changed && styles.scoreChanged]}
+                              selectTextOnFocus
+                              returnKeyType="done"
+                            />
+                          </View>
+                        );
+                      })}
+                    </>
                   )}
 
                   <FormError message={error} style={styles.error} />
@@ -518,13 +577,35 @@ const createStyles = (colors) =>
       borderColor: colors.neutral[200],
     },
     rowFlagged: { borderColor: colors.accent },
+    /* A row with nothing in it is the one a teacher is looking for, so it is the one marked — a
+       quiet left edge rather than a colour over the whole row, which at forty rows would be a wall
+       of highlight rather than a signal. */
+    rowBlank: { borderLeftWidth: 3, borderLeftColor: colors.neutral[400] },
+    // An edit not yet written. The accent, because this is what Save is about to act on.
+    rowChanged: { borderLeftWidth: 3, borderLeftColor: colors.accent, borderColor: colors.accent },
+    outOf: { fontFamily: fonts.regular, fontSize: 12, color: colors.neutral[500] },
+    progress: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      paddingHorizontal: spacing.xs,
+      paddingBottom: spacing.xs,
+    },
+    progressCount: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
+    progressLeft: { fontFamily: fonts.regular, fontSize: 13, color: colors.accentRamp[300] },
+    progressDone: { fontFamily: fonts.regular, fontSize: 13, color: colors.neutral[500] },
     rowText: { flex: 1 },
     name: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
     nameUnmatched: { color: colors.neutral[500], fontStyle: 'italic' },
     matchNote: { fontFamily: fonts.regular, fontSize: 11.5, color: colors.neutral[500], marginTop: 2 },
     scoreInput: {
-      width: 68,
-      paddingVertical: 7,
+      /* Wider and taller than it was (68 x ~30). A numeric box a teacher taps forty times in a
+         row, holding a phone in one hand, needs to clear the 44px minimum target rather than sit
+         just under half of it. */
+      width: 76,
+      minHeight: 44,
+      paddingVertical: 10,
       paddingHorizontal: 10,
       borderRadius: 8,
       textAlign: 'center',
@@ -535,6 +616,7 @@ const createStyles = (colors) =>
       borderWidth: 1,
       borderColor: colors.neutral[200],
     },
+    scoreChanged: { borderColor: colors.accent, borderWidth: 1.5 },
     scoreDisabled: { opacity: 0.45 },
     cameraWrap: { flex: 1, backgroundColor: '#000' },
     cameraBar: { padding: spacing.lg, gap: spacing.sm, backgroundColor: colors.bg },

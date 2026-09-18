@@ -176,6 +176,10 @@ export const en = {
   'report.noneYet': 'No report has been sent to this family yet.',
 
   /* ── recording marks ────────────────────────────────────────────────────── */
+  'marks.progress': '{marked} of {total} marked',
+  'marks.stillToMark': { one: '{count} still to mark', other: '{count} still to mark' },
+  'marks.allMarked': 'the whole class is marked',
+  'marks.outOf': 'of {max}',
   'marks.title': 'Record marks',
   'marks.loadingClasses': 'Loading your classes…',
   'marks.noClasses':
