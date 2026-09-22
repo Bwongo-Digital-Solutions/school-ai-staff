@@ -31,6 +31,49 @@ export const fr = {
   'tab.students': 'Élèves',
   'tab.assistant': 'Assistant',
   'tab.profile': 'Profil',
+  'tab.child': 'Mon enfant',
+
+  /* ------------------------------------------------------- l'espace parents --- */
+  'role.parent': 'Parent ou tuteur',
+  'parent.title': 'Votre enfant',
+  'parent.pendingTitle': "En attente de validation par l'école",
+  'parent.pendingBody':
+    'Le secrétariat a reçu votre demande et confirmera que vous êtes bien le parent ou le tuteur '
+    + 'de cet enfant. Tout apparaîtra ici dès que ce sera fait.',
+  'parent.balance': 'Solde',
+  'parent.attendance': 'Présence',
+  'parent.average': 'Moyenne',
+  'parent.position': 'Rang {position} sur {of}',
+  'parent.paidOf': '{paid} déjà payés',
+  'parent.gateTitle': 'Arrivées et sorties',
+  'parent.gateNote': 'La première arrivée et le dernier départ de chaque jour.',
+  'parent.gateEmpty': 'Rien enregistré au portail pour le moment.',
+  'parent.arrived': 'entrée à {time}',
+  'parent.left': 'sortie à {time}',
+  'parent.noArrival': 'aucune arrivée enregistrée',
+  'parent.healthTitle': 'Infirmerie',
+  'parent.healthEmpty': "Aucun passage à l'infirmerie.",
+  'parent.disciplineTitle': 'Comportement',
+  'parent.disciplineEmpty': 'Rien à signaler.',
+  'parentReq.title': 'Écrire au secrétariat',
+  'parentReq.note':
+    "Ceci envoie un message au secrétariat. Cela n'ouvre pas le portail\u00A0: quelqu'un de "
+    + "l'école doit d'abord donner son accord, et vous verrez sa réponse ici.",
+  'parentReq.pickup': 'Venir le chercher plus tôt',
+  'parentReq.absence': 'Justifier une absence',
+  'parentReq.reason': 'Pourquoi',
+  'parentReq.pickupHint': 'Rendez-vous chez le dentiste à quatorze heures',
+  'parentReq.absenceHint': 'Elle a eu le paludisme et était à la clinique',
+  'parentReq.send': 'Envoyer au secrétariat',
+  'parentReq.sent': 'Envoyé au secrétariat',
+  'parentReq.sentBody':
+    "Vous verrez leur réponse ici. Rien ne change au portail tant qu'ils n'ont pas donné leur accord.",
+  'parentReq.failed': "Votre demande n'a pas pu être envoyée",
+  'parentReq.status.pending': 'En attente',
+  'parentReq.status.approved': 'Accordé',
+  'parentReq.status.declined': 'Refusé',
+  'parentReq.status.cancelled': 'Annulé',
+
 
   /* ------------------------------------------------------------------------------- the alerts */
   'alert.done': 'Terminé',

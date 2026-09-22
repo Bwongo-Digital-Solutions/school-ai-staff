@@ -9,6 +9,18 @@
 
 export const TABS = ['home', 'scan', 'students', 'assistant', 'profile'];
 
+/**
+ * A guardian's tabs, which are not a subset of the staff ones.
+ *
+ * Every tab above is a staff job: scanning somebody else's card, a roster of other people's
+ * children, an assistant that answers about the whole school. None of them is a parent's, and the
+ * server refuses all three to a guardian anyway. So a guardian gets their own two — their child,
+ * and the account they sign out from — rather than a staff tab bar with most of it removed.
+ */
+export const PARENT_TABS = ['child', 'profile'];
+
+export const isGuardian = (user) => !!user && user.role === 'parent';
+
 export const isSupport = (user) => !!user && user.role === 'support_staff';
 
 export const designationOf = (user) => (user && user.designation) || null;
@@ -128,6 +140,13 @@ const TAB_FEATURE = {
   assistant: 'assistant',
 };
 
+/* The guardian's child tab follows the portal switch, so a school that turns the portal off leaves
+   a parent with Profile and a clear message rather than a tab that refuses. Profile is ungated for
+   the same reason it is for staff: it is how an account is left. */
+const PARENT_TAB_FEATURE = {
+  child: 'parent_portal',
+};
+
 /**
  * Whether a feature is on, given what the server said.
  *
@@ -153,6 +172,13 @@ export const featureOn = (features, key) => {
  * `features` is the `features` map from /api/entitlements, or null before it has been read.
  */
 export const allowedTabs = (user, features = null) => {
+  /* A guardian answers before either fence, because neither question applies: they are not staff
+     with a narrower role, they are a different kind of account. Asking "which staff tabs does this
+     person get" of a parent is how they would end up with the scanner. */
+  if (isGuardian(user)) {
+    return PARENT_TABS.filter((tab) => featureOn(features, PARENT_TAB_FEATURE[tab]));
+  }
+
   const byRole = hasRoster(user) ? TABS : TABS.filter((t) => t !== 'students' && t !== 'assistant');
   return byRole.filter((tab) => featureOn(features, TAB_FEATURE[tab]));
 };
@@ -166,6 +192,7 @@ export const ROLE_LABEL_KEYS = {
   bursar: 'role.bursar',
   teacher: 'role.teacher',
   support_staff: 'role.support_staff',
+  parent: 'role.parent',
 };
 
 export const DESIGNATION_LABEL_KEYS = {

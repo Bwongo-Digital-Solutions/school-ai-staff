@@ -502,6 +502,31 @@ export const schoolApi = {
   /* Marks. `extract` reads a file and deliberately writes nothing: the teacher checks the
      proposal and `save` is a separate act. The server matches names to the register, so a model
      never chooses which child a mark belongs to. */
+  /* ------------------------------------------------------------------ the parent portal ---
+   *
+   * Its own endpoint, as on the web. A guardian is refused every staff route above and staff are
+   * refused these, so there is no shared helper that could be pointed at the wrong door.
+   *
+   * `studentId` is optional: a guardian with one child is the common case on a phone, and the
+   * server resolves it rather than making the app ask what it already knows.
+   */
+  parentChildren: () =>
+    post('/api/functions/parent', { action: 'children' }).then((d) => (d && d.children) || []),
+
+  parentOverview: (studentId) =>
+    post('/api/functions/parent', { action: 'overview', ...(studentId ? { studentId } : {}) }),
+
+  parentRequests: (studentId) =>
+    post('/api/functions/parent', { action: 'requests', ...(studentId ? { studentId } : {}) })
+      .then((d) => (d && d.requests) || []),
+
+  /* Asking the office, which is not the same as being granted anything — see the server's
+     parent_requests table. Nothing here opens a gate. */
+  parentAsk: ({ studentId, kind, reason, requestedFor }) =>
+    post('/api/functions/parent', {
+      action: 'request', studentId, kind, reason, requestedFor,
+    }),
+
   markClasses: () =>
     post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
 
