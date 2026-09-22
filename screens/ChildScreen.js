@@ -40,7 +40,12 @@ const clock = (value) => {
 
 export default function ChildScreen() {
   const { colors } = useTheme();
-  const t = useT();
+  /* `useT()` hands back the whole language context — { t, language, setLanguage } — so the
+     translator has to be picked out of it. Taking the object as `t` made every `t('…')` in this
+     file a call on a plain object, which threw on the first one and tore the tree down: a blank
+     screen with no tab bar, for guardians only, because this is the only screen they get. Every
+     other screen in this app destructures; this one did not. */
+  const { t } = useT();
   const s = useMemo(() => createStyles(colors), [colors]);
 
   const [children, setChildren] = useState([]);
