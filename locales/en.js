@@ -37,6 +37,48 @@ export const en = {
   'tab.students': 'Students',
   'tab.assistant': 'Assistant',
   'tab.profile': 'Profile',
+  'tab.child': 'My child',
+
+  /* ------------------------------------------------------------------ the parent portal --- */
+  'role.parent': 'Parent or guardian',
+  'parent.title': 'Your child',
+  'parent.pendingTitle': 'Waiting for the school to approve you',
+  'parent.pendingBody':
+    'The office has your request and will confirm you are this child’s parent or guardian. '
+    + 'You will see everything here as soon as they do.',
+  'parent.balance': 'Balance',
+  'parent.attendance': 'Attendance',
+  'parent.average': 'Average mark',
+  'parent.position': 'Position {position} of {of}',
+  'parent.paidOf': '{paid} paid so far',
+  'parent.gateTitle': 'Arriving and leaving',
+  'parent.gateNote': 'The first arrival and the last departure each day.',
+  'parent.gateEmpty': 'Nothing recorded at the gate yet.',
+  'parent.arrived': 'in at {time}',
+  'parent.left': 'out at {time}',
+  'parent.noArrival': 'no arrival recorded',
+  'parent.healthTitle': 'Sick bay',
+  'parent.healthEmpty': 'No sick bay visits.',
+  'parent.disciplineTitle': 'Behaviour',
+  'parent.disciplineEmpty': 'Nothing recorded.',
+  'parentReq.title': 'Ask the office',
+  'parentReq.note':
+    'This sends a message to the office. It does not open the gate — somebody at the school has '
+    + 'to agree first, and you will see their answer here.',
+  'parentReq.pickup': 'Collecting them early',
+  'parentReq.absence': 'Explaining an absence',
+  'parentReq.reason': 'Why',
+  'parentReq.pickupHint': 'Dentist at two o’clock',
+  'parentReq.absenceHint': 'She had malaria and was at the clinic',
+  'parentReq.send': 'Send to the office',
+  'parentReq.sent': 'Sent to the office',
+  'parentReq.sentBody': 'You will see their answer here. Nothing changes at the gate until they agree.',
+  'parentReq.failed': 'Your request could not be sent',
+  'parentReq.status.pending': 'Waiting',
+  'parentReq.status.approved': 'Agreed',
+  'parentReq.status.declined': 'Not agreed',
+  'parentReq.status.cancelled': 'Cancelled',
+
 
   /* ------------------------------------------------------------------------------- the alerts */
   'alert.done': 'Done',

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { House, QrCode, Users, Sparkle, UserCircle } from 'phosphor-react-native';
+import { House, QrCode, Users, Sparkle, UserCircle, Student } from 'phosphor-react-native';
 import { useTheme, spacing, fonts } from '../theme';
 import { allowedTabs } from '../roles';
 import { useT } from '../i18n';
@@ -11,6 +11,9 @@ const TABS = [
   { key: 'scan', label: 'tab.scan', icon: QrCode },
   { key: 'students', label: 'tab.students', icon: Users },
   { key: 'assistant', label: 'tab.assistant', icon: Sparkle },
+  /* A guardian's tab. It sits before Profile because it is the whole app for them — the
+     staff tabs above are never drawn alongside it; allowedTabs returns one set or the other. */
+  { key: 'child', label: 'tab.child', icon: Student },
   { key: 'profile', label: 'tab.profile', icon: UserCircle },
 ];
 

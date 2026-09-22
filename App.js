@@ -26,6 +26,7 @@ import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PrintClassScreen from './screens/PrintClassScreen';
+import ChildScreen from './screens/ChildScreen';
 import UpdateBanner from './components/UpdateBanner';
 import SyncBanner from './components/SyncBanner';
 import { checkForUpdate, dismissUpdate } from './update';
@@ -724,6 +725,10 @@ function Root() {
         )}
 
         {route.name === 'printClass' && <PrintClassScreen user={user} onBack={pop} />}
+
+        {/* A guardian's only screen besides Profile. Its own route rather than a variant of the
+            roster: a parent has one child in view, not a school. */}
+        {route.name === 'child' && <ChildScreen />}
 
         {route.name === 'assistant' && (
           <AssistantScreen
