@@ -17,7 +17,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
-import { CaretDown, PaperPlaneTilt } from 'phosphor-react-native';
+import { PaperPlaneTilt } from 'phosphor-react-native';
 
 import { useTheme, spacing, fonts } from '../theme';
 import { schoolApi, ApiError } from '../api';
@@ -254,8 +254,10 @@ export default function ChildScreen() {
             placeholder={kind === 'pickup' ? t('parentReq.pickupHint') : t('parentReq.absenceHint')}
           />
 
+          {/* `label`, not `title`: Button takes label, and the wrong prop name rendered a button
+              with no words on it rather than failing anywhere visible. */}
           <Button
-            title={t('parentReq.send')}
+            label={t('parentReq.send')}
             icon={PaperPlaneTilt}
             onPress={ask}
             disabled={busy || !reason.trim()}

@@ -93,12 +93,26 @@ function Root() {
   const { refresh: refreshBranding } = useBranding();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [fontsLoaded] = useFonts({
+  /* The second element is the error, and discarding it is how this app came to show nothing at
+     all. `useFonts` leaves `loaded` false for ever when loading fails, so the gate below — which
+     waits for `fontsLoaded` — held the whole app on an empty themed View: no message, no sign-in,
+     no way out but reinstalling. A font that will not load is worth losing; the app is not. */
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  /* Ready means loaded *or* known to have failed. Android falls back to the system face for a
+     family it does not have, so a teacher gets the app in a slightly different typeface rather
+     than a blank screen. */
+  const fontsSettled = fontsLoaded || Boolean(fontError);
+
+  useEffect(() => {
+    // Recorded once, because the only other evidence of this is a typeface nobody may notice.
+    if (fontError) console.warn('The bundled fonts did not load; using the system face.', fontError);
+  }, [fontError]);
 
   const [booted, setBooted] = useState(false);
   const [user, setUser] = useState(null);
@@ -262,17 +276,31 @@ function Root() {
        * Either way, restoring the user would draw a signed-in app around a credential that does
        * not exist: every read refused, an empty roster, and no way out that anybody would guess
        * except signing out and back in. Better to ask for the sign-in that is actually needed. */
-      if (storedUser && base && !api.token()) {
+      /* Restoring a session must never be able to stop the app booting.
+       *
+       * `setBooted(true)` is the only thing standing between this app and a permanently blank
+       * screen: the render gate waits on it, and nothing retries. Anything thrown between here and
+       * there — a stored user of an unexpected shape, a helper that assumed a field — used to mean
+       * an app that never started and gave no reason. Signing in again is a recoverable state; a
+       * dead window is not, so the restore is allowed to fail and boot is not. */
+      try {
+        if (storedUser && base && !api.token()) {
+          AsyncStorage.removeItem(STORAGE.user).catch(() => {});
+          setSessionEnded(true);
+        } else if (storedUser && base) {
+          // Reopening the app, not signing in. The same reason as at sign-in: a guardian has no
+          // home tab, so starting on one shows them the staff screen until an effect notices.
+          setTab(landingTab(storedUser));
+          setUser(storedUser);
+        }
+      } catch (error) {
+        console.warn('The stored session could not be restored; asking for a sign-in.', error);
         AsyncStorage.removeItem(STORAGE.user).catch(() => {});
         setSessionEnded(true);
-      } else if (storedUser && base) {
-        // Reopening the app, not signing in. The same reason as at sign-in: a guardian has no home
-        // tab, so starting on one shows them the staff screen until an effect notices.
-        setTab(landingTab(storedUser));
-        setUser(storedUser);
+      } finally {
+        setBooted(true);
       }
 
-      setBooted(true);
       if (base) refreshBranding();
     })();
     return () => {
@@ -618,7 +646,7 @@ function Root() {
 
   useNewMessageChime(inbox);
 
-  if (!fontsLoaded || !booted) {
+  if (!fontsSettled || !booted) {
     return (
       <View style={styles.root}>
         {statusBar}
