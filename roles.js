@@ -183,6 +183,27 @@ export const allowedTabs = (user, features = null) => {
   return byRole.filter((tab) => featureOn(features, TAB_FEATURE[tab]));
 };
 
+/**
+ * Where this person lands, and where they are put back when a tab stops being theirs.
+ *
+ * Not the literal 'home'. A guardian has no home tab — their tabs are 'child' and 'profile' — so
+ * falling back to 'home' put a parent on the staff home screen: the scanner, the roster actions,
+ * and a crash on the first one that asked the server for something a guardian may not have. The
+ * tab bar was drawing the right two tabs the whole time; the router simply sent them somewhere
+ * that was not in the list.
+ *
+ * Derived from `allowedTabs` rather than written out per role, so a fallback can never name a tab
+ * the tab bar does not offer — which is the bug this replaces.
+ *
+ * 'home' when there is nobody signed in, because that is the sign-in screen.
+ */
+export const landingTab = (user, features = null) => {
+  if (!user) return 'home';
+  const allowed = allowedTabs(user, features);
+  if (allowed.includes('home')) return 'home';
+  return allowed[0] || 'profile';
+};
+
 /* The six roles the server recognises (server/auth/roles.mjs). The three that were missing here
    rendered as a raw role string — "head_teacher" — on every screen that shows a job title. */
 export const ROLE_LABEL_KEYS = {

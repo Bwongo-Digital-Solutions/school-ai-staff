@@ -13,7 +13,7 @@ import { ThemeProvider, screenTopInset, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError, flushOutbox } from './api';
 import { onPendingChange } from './outbox';
-import { allowedTabs, canPrintDocuments, featureOn, hasRoster, isAskari } from './roles';
+import { allowedTabs, canPrintDocuments, featureOn, hasRoster, isAskari, landingTab } from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
@@ -266,6 +266,9 @@ function Root() {
         AsyncStorage.removeItem(STORAGE.user).catch(() => {});
         setSessionEnded(true);
       } else if (storedUser && base) {
+        // Reopening the app, not signing in. The same reason as at sign-in: a guardian has no home
+        // tab, so starting on one shows them the staff screen until an effect notices.
+        setTab(landingTab(storedUser));
         setUser(storedUser);
       }
 
@@ -342,7 +345,7 @@ function Root() {
 
   const goToTab = useCallback(
     (next) => {
-      const target = allowedTabs(user, features).includes(next) ? next : 'home';
+      const target = allowedTabs(user, features).includes(next) ? next : landingTab(user, features);
       stackRef.current = [];
       setStack([]);
       setTab(target);
@@ -492,12 +495,16 @@ function Root() {
     loadedRef.current = false;
     stackRef.current = [];
     setStack([]);
-    setTab('home');
+    /* The tab this account actually has, not 'home'. The guard effect below would correct a
+       guardian a moment later, but "a moment later" is a visible frame of the staff home screen —
+       and the entitlements it waits on have not arrived yet at this point, so the correction can
+       be more than a frame on a slow connection. */
+    setTab(landingTab(nextUser, features));
     setInbox(EMPTY_INBOX);
     setPendingGate(EMPTY_PENDING_GATE);
     setChat(EMPTY_CHAT);
     setUser(nextUser);
-  }, [refreshBranding]);
+  }, [refreshBranding, features]);
 
   const handleSignOut = useCallback(() => {
     AsyncStorage.removeItem(STORAGE.user).catch(() => {});
@@ -546,7 +553,7 @@ function Root() {
    */
   useEffect(() => {
     if (!user) return;
-    if (!allowedTabs(user, features).includes(tab)) setTab('home');
+    if (!allowedTabs(user, features).includes(tab)) setTab(landingTab(user, features));
   }, [user, features, tab]);
 
   /* Also refreshed on every return to the root, so a decision made on the gate list is
