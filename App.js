@@ -26,6 +26,8 @@ import StudentsScreen from './screens/StudentsScreen';
 import StudentCardScreen from './screens/StudentCardScreen';
 import ReportScreen from './screens/ReportScreen';
 import PrintClassScreen from './screens/PrintClassScreen';
+import CurriculumScreen from './screens/CurriculumScreen';
+import ParentRequestsScreen from './screens/ParentRequestsScreen';
 import ChildScreen from './screens/ChildScreen';
 import UpdateBanner from './components/UpdateBanner';
 import SyncBanner from './components/SyncBanner';
@@ -722,6 +724,8 @@ function Root() {
             onOpenMatron={() => push({ name: 'matron' })}
             onRegisterStudent={() => push({ name: 'register' })}
             onRecordMarks={() => push({ name: 'marks' })}
+            onOpenCurriculum={() => push({ name: 'curriculum' })}
+            onOpenParentRequests={() => push({ name: 'parentRequests' })}
             onRetry={retry}
             onScanPress={() => goToTab('scan')}
             onOpenStudent={openStudent}
@@ -760,6 +764,10 @@ function Root() {
         )}
 
         {route.name === 'printClass' && <PrintClassScreen user={user} onBack={pop} />}
+
+        {route.name === 'curriculum' && <CurriculumScreen onBack={pop} />}
+
+        {route.name === 'parentRequests' && <ParentRequestsScreen onBack={pop} />}
 
         {/* A guardian's only screen besides Profile. Its own route rather than a variant of the
             roster: a parent has one child in view, not a school. */}

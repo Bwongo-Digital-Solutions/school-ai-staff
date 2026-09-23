@@ -127,6 +127,23 @@ const GATE_ROLES = ['admin', 'head_teacher', 'support_staff'];
 export const canWatchGate = (user) => !!user && GATE_ROLES.includes(user.role);
 
 /**
+ * May answer a parent's collection or absence request.
+ *
+ * The head teacher, the administrator and the Director of Studies — the three posts a parent may
+ * address a request to. Mirrors `canDecideParentRequest` in the server's services/approvers.mjs,
+ * which is what actually enforces it; this only decides whether the action is offered.
+ *
+ * Any of the three may answer any request, whoever it was addressed to. A child waiting at a gate
+ * because the DOS is away is worse than a head teacher covering, and the queue marks whose is
+ * whose so covering is a choice rather than an accident.
+ */
+export const canDecideParentRequests = (user) => {
+  if (!user) return false;
+  if (user.role === 'admin' || user.role === 'head_teacher') return true;
+  return designationOf(user) === 'director_of_studies';
+};
+
+/**
  * Which feature each tab belongs to, mirroring the registry in server/licensing/plans.mjs.
  *
  * `home` and `profile` are absent on purpose, and not by oversight. Home is where a teacher lands and

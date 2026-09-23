@@ -28,7 +28,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
-import { PaperPlaneTilt } from 'phosphor-react-native';
+import { Minus, PaperPlaneTilt, TrendDown, TrendUp } from 'phosphor-react-native';
 
 import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi, ApiError } from '../api';
@@ -41,6 +41,7 @@ import Card from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import Field from '../components/Field';
+import Select from '../components/Select';
 import StatTile from '../components/StatTile';
 import DetailRow from '../components/DetailRow';
 import SectionLabel from '../components/SectionLabel';
@@ -80,6 +81,85 @@ function Segment({ label, active, onPress, styles }) {
   );
 }
 
+/**
+ * The child's average per day of marking, as a column of bars.
+ *
+ * Drawn with Views rather than a chart library: one series, no axes worth the room on a phone, and
+ * the alternative is a native dependency and a new APK for a picture six bars wide.
+ *
+ * Bars are scaled against 100, not against the child's own best. A series normalised to its own
+ * maximum makes every child look like they peak, and a parent reading "the last bar is tallest"
+ * would be reading an artefact of the scaling rather than a mark.
+ */
+function Sparkline({ rounds, styles, colors }) {
+  if (rounds.length < 2) return null;
+  return (
+    <View style={styles.spark} accessible accessibilityLabel={rounds.map((r) => `${r.percent}%`).join(', ')}>
+      {rounds.map((round, index) => (
+        <View key={round.day} style={styles.sparkCol}>
+          <View
+            style={[
+              styles.sparkBar,
+              { height: `${Math.max(4, Math.min(100, round.percent))}%` },
+              index === rounds.length - 1 && { backgroundColor: colors.accent },
+            ]}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* Direction is never carried by colour alone: the arrow and the number say it too, which is what
+   makes it readable to somebody who cannot separate the green from the red. */
+const DIRECTION = {
+  up: { icon: TrendUp, tone: 'green' },
+  down: { icon: TrendDown, tone: 'red' },
+  steady: { icon: Minus, tone: 'neutral' },
+  first: { icon: null, tone: 'neutral' },
+};
+
+function SubjectRow({ subject, isLast, styles, colors, t }) {
+  const direction = DIRECTION[subject.direction] || DIRECTION.steady;
+  const Icon = direction.icon;
+  const toneColor =
+    direction.tone === 'green' ? colors.status.green
+      : direction.tone === 'red' ? colors.status.red
+        : colors.neutral[500];
+
+  const change = subject.change === null ? null : Math.abs(subject.change);
+  const changeLabel = subject.direction === 'first'
+    ? t('parent.firstMark')
+    : subject.direction === 'steady'
+      ? t('parent.steady')
+      : t(subject.direction === 'up' ? 'parent.up' : 'parent.down', { change: `${change}` });
+
+  return (
+    <View style={[styles.subjectRow, isLast && styles.subjectRowLast]}>
+      <View style={styles.subjectTop}>
+        <Text style={styles.subjectName} numberOfLines={1}>{subject.subject}</Text>
+        <Text style={styles.subjectScore}>
+          {subject.latest === null ? '—' : `${subject.latest}%`}
+        </Text>
+      </View>
+
+      {/* Against 100, for the same reason the sparkline is. */}
+      <View style={styles.meter}>
+        <View style={[styles.meterFill, { width: `${Math.max(2, Math.min(100, subject.latest || 0))}%` }]} />
+      </View>
+
+      <View style={styles.subjectMeta}>
+        {Icon ? <Icon size={13} color={toneColor} weight="bold" /> : null}
+        <Text style={[styles.changeText, { color: toneColor }]}>{changeLabel}</Text>
+        <Text style={styles.subjectCount}>
+          {`· ${t('parent.subjectMarks', { count: subject.marks })}`}
+          {subject.best !== null && subject.marks > 1 ? ` · ${t('parent.best', { percent: subject.best })}` : ''}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ChildScreen() {
   const { colors } = useTheme();
   /* `useT()` hands back the whole language context — { t, language, setLanguage } — so the
@@ -99,6 +179,11 @@ export default function ChildScreen() {
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState('pickup');
   const [reason, setReason] = useState('');
+  /* Who the request is addressed to. Posts, not people — the server builds the list from the posts
+     this school actually has somebody approved in, so a parent cannot address a collection to an
+     empty desk and then wait for an answer that was never coming. */
+  const [approvers, setApprovers] = useState([]);
+  const [addressedTo, setAddressedTo] = useState('');
 
   const load = useCallback(async (childId) => {
     setLoading(true);
@@ -131,6 +216,21 @@ export default function ChildScreen() {
 
   useEffect(() => { load(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* Fetched once. A school that appoints a Director of Studies mid-term needs a parent to reopen
+     the app to see them, which is the right trade against asking on every render. */
+  useEffect(() => {
+    let cancelled = false;
+    schoolApi.parentApprovers()
+      .then((list) => {
+        if (cancelled) return;
+        setApprovers(list);
+        // Pre-selected only when there is exactly one, where a dropdown would be a formality.
+        if (list.length === 1) setAddressedTo(list[0].key);
+      })
+      .catch(() => { /* the form still works unaddressed — the office sees it either way */ });
+    return () => { cancelled = true; };
+  }, []);
+
   /* Pull-to-refresh keeps its own flag. Driving the spinner from `loading` put it on screen during
      the first load as well, so the screen opened mid-refresh over an empty page. */
   const refresh = useCallback(async () => {
@@ -143,7 +243,7 @@ export default function ChildScreen() {
     if (!reason.trim()) return;
     setBusy(true);
     try {
-      await schoolApi.parentAsk({ studentId: selected, kind, reason: reason.trim() });
+      await schoolApi.parentAsk({ studentId: selected, kind, reason: reason.trim(), addressedTo });
       setReason('');
       alertSuccess(t('parentReq.sent'), t('parentReq.sentBody'));
       setRequests(await schoolApi.parentRequests(selected));
@@ -170,6 +270,13 @@ export default function ChildScreen() {
   const gateDays = overview && overview.gate ? overview.gate.days.slice(0, 7) : [];
   const health = (overview && overview.health) || [];
   const discipline = (overview && overview.discipline) || [];
+  const performance = (overview && overview.performance) || null;
+
+  /* The post a request went to, in this school's own words. Falls back to the stored key rather
+     than to nothing: a school that has since abolished the post should still show where an old
+     request was sent. */
+  const approverLabel = (key) =>
+    (approvers.find((a) => a.key === key) || {}).label || key.replace(/_/g, ' ');
 
   /* Built as a list rather than three conditional elements so the last one can be widened when
      the count is odd. A two-column grid leaves a lone tile sitting in half a row beside nothing,
@@ -260,6 +367,51 @@ export default function ChildScreen() {
                 {t('parent.position', { position: academics.position, of: academics.class_size || 0 })}
               </Text>
             ) : null}
+          </>
+        )}
+
+        {/* ------------------------------------------------- how they are doing, over time */}
+        {performance && (
+          <>
+            <SectionLabel>{t('parent.progressTitle')}</SectionLabel>
+            <Card style={styles.sectionCard}>
+              {performance.marksRecorded === 0 ? (
+                <Text style={styles.empty}>{t('parent.progressEmpty')}</Text>
+              ) : (
+                <>
+                  <View style={styles.progressHead}>
+                    <View style={styles.progressHeadText}>
+                      <Text style={styles.progressFigure}>
+                        {performance.average === null ? '—' : `${Math.round(performance.average)}%`}
+                      </Text>
+                      <Text style={styles.progressCaption}>{t('parent.progressAverage')}</Text>
+                    </View>
+                    <Sparkline rounds={performance.overall} styles={styles} colors={colors} />
+                  </View>
+
+                  {performance.overall.length > 1 ? (
+                    <Text style={styles.quietNote}>{t('parent.progressRounds')}</Text>
+                  ) : null}
+
+                  <View style={styles.subjectList}>
+                    {performance.subjects.map((subject, index) => (
+                      <SubjectRow
+                        key={subject.id}
+                        subject={subject}
+                        isLast={index === performance.subjects.length - 1}
+                        styles={styles}
+                        colors={colors}
+                        t={t}
+                      />
+                    ))}
+                  </View>
+
+                  <Text style={styles.quietNote}>
+                    {`${t('parent.progressMarks', { count: performance.marksRecorded })} · ${t('parent.progressNote')}`}
+                  </Text>
+                </>
+              )}
+            </Card>
           </>
         )}
 
@@ -361,6 +513,21 @@ export default function ChildScreen() {
             />
           </View>
 
+          {/* Who to ask. Drawn only when the school has somebody to ask and the choice is real —
+              with a single post the dropdown would be a formality, and it is pre-selected instead. */}
+          {approvers.length > 1 && (
+            <View style={styles.formField}>
+              <Select
+                label={t('parentReq.addressTo')}
+                title={t('parentReq.addressTo')}
+                placeholder={t('parentReq.addressToHint')}
+                value={addressedTo}
+                onChange={setAddressedTo}
+                options={approvers.map((a) => ({ value: a.key, label: a.label }))}
+              />
+            </View>
+          )}
+
           {/* `label`, not `title`: Button takes label, and the wrong prop name rendered a button
               with no words on it rather than failing anywhere visible. */}
           <Button
@@ -378,7 +545,11 @@ export default function ChildScreen() {
             {requests.map((request, index) => (
               <DetailRow
                 key={request.id}
-                title={t(`parentReq.${request.kind}`)}
+                title={
+                  request.addressed_to
+                    ? `${t(`parentReq.${request.kind}`)} · ${approverLabel(request.addressed_to)}`
+                    : t(`parentReq.${request.kind}`)
+                }
                 value={request.reason + (request.decided_note ? ` · ${request.decided_note}` : '')}
                 isLast={index === requests.length - 1}
                 action={
@@ -483,6 +654,106 @@ const createStyles = (colors) =>
     },
     segmentLabelActive: {
       color: colors.accentRamp[200],
+    },
+    /* ── the progress tracker ───────────────────────────────────────────────── */
+    progressHead: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: spacing.lg,
+    },
+    progressHeadText: {
+      flexShrink: 1,
+    },
+    progressFigure: {
+      fontFamily: fonts.medium,
+      fontSize: 28,
+      lineHeight: 32,
+      color: colors.text,
+    },
+    progressCaption: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.neutral[500],
+      marginTop: 2,
+    },
+    spark: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 3,
+      height: 44,
+      flexShrink: 0,
+    },
+    sparkCol: {
+      width: 8,
+      height: '100%',
+      justifyContent: 'flex-end',
+    },
+    sparkBar: {
+      width: '100%',
+      borderRadius: 2,
+      backgroundColor: colors.accentRamp[700],
+      minHeight: 3,
+    },
+    subjectList: {
+      marginTop: spacing.lg,
+    },
+    subjectRow: {
+      paddingBottom: spacing.lg,
+      marginBottom: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.neutral[900],
+    },
+    subjectRowLast: {
+      paddingBottom: 0,
+      marginBottom: 0,
+      borderBottomWidth: 0,
+    },
+    subjectTop: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    subjectName: {
+      flex: 1,
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      color: colors.text,
+    },
+    subjectScore: {
+      fontFamily: fonts.semibold,
+      fontSize: 15,
+      color: colors.text,
+    },
+    // The track is the full width; the fill is the mark out of 100.
+    meter: {
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: colors.neutral[900],
+      marginTop: spacing.sm,
+      overflow: 'hidden',
+    },
+    meterFill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+    },
+    subjectMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    changeText: {
+      fontFamily: fonts.medium,
+      fontSize: 12,
+    },
+    subjectCount: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.neutral[500],
     },
     formField: {
       marginTop: spacing.lg,

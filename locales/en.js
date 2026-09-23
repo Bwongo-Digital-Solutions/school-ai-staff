@@ -41,6 +41,44 @@ export const en = {
 
   /* ------------------------------------------------------------------ the parent portal --- */
   'role.parent': 'Parent or guardian',
+  /* ── the curriculum guide ───────────────────────────────────────────────
+     Only the screen's own furniture. The guidance itself comes from the server and is authored in
+     English on purpose: "Activity of Integration", "generic skill" and "achievement level" are
+     terms of art from NCDC and UNEB documents, and a translation that did not come from them
+     would be a second vocabulary for a teacher to reconcile with the papers on their desk. */
+  'curriculum.title': 'Curriculum guide',
+  'curriculum.subtitle':
+    'What the Ministry of Education and Sports means by a competency-based curriculum, and what it asks of you in the classroom.',
+  'curriculum.loading': 'Opening the guide…',
+  'curriculum.failed': 'The guide could not be opened.',
+  'curriculum.revised': 'Revised {date}',
+  'curriculum.notASubstitute':
+    'A summary, not a replacement for your subject’s NCDC syllabus or the current UNEB circular.',
+  'curriculum.basedOn': 'Based on:',
+  'curriculum.sources': 'Where this comes from',
+  'curriculum.sourcesNote': 'Check anything you are about to tell a parent or an inspector.',
+  'curriculum.officialSources': 'Official',
+  'curriculum.reportingSources': 'Reporting about it',
+  'curriculum.otherCountry':
+    'This school is not set to a Ugandan grading scheme, so this guide describes another country’s curriculum. It is here to read, not to follow.',
+  'home.parentRequests': 'Parent requests',
+  'parentQueue.title': 'Parent requests',
+  'parentQueue.loading': 'Loading requests…',
+  'parentQueue.failed': 'The requests could not be loaded.',
+  'parentQueue.empty': 'Nothing waiting. Requests parents send appear here.',
+  'parentQueue.note': 'Approving records the school’s answer. It does not open the gate — a pass is still issued at the office.',
+  'parentQueue.forYou': 'Addressed to you',
+  'parentQueue.forOther': 'Addressed to the {post}',
+  'parentQueue.forAnyone': 'Not addressed to anyone in particular',
+  'parentQueue.aGuardian': 'A guardian',
+  'parentQueue.noteLabel': 'Your answer',
+  'parentQueue.noteHint': 'Collect from the office at 13:45',
+  'parentQueue.approve': 'Approve',
+  'parentQueue.decline': 'Decline',
+  'parentQueue.approved': 'Approved',
+  'parentQueue.approvedBody': 'The parent can see it. Issue the gate pass at the office when they arrive.',
+  'parentQueue.declined': 'Declined',
+  'parentQueue.decideFailed': 'That could not be answered',
   'parent.title': 'Your child',
   'parent.pendingTitle': 'Waiting for the school to approve you',
   'parent.pendingBody':
@@ -52,6 +90,20 @@ export const en = {
   'parent.average': 'Average mark',
   'parent.position': 'Position {position} of {of}',
   'parent.paidOf': '{paid} paid so far',
+  /* ── how a child is doing, over time ───────────────────────────────────── */
+  'parent.progressTitle': 'How they are doing',
+  'parent.progressNote':
+    'Every mark the school has recorded, newest last. A subject with one mark has no direction yet.',
+  'parent.progressEmpty': 'No marks recorded yet.',
+  'parent.progressMarks': { one: '{count} mark recorded', other: '{count} marks recorded' },
+  'parent.progressAverage': 'Average across every mark',
+  'parent.progressRounds': 'Each bar is one day of marking',
+  'parent.up': 'up {change}',
+  'parent.down': 'down {change}',
+  'parent.steady': 'about the same',
+  'parent.firstMark': 'first mark',
+  'parent.subjectMarks': { one: '{count} mark', other: '{count} marks' },
+  'parent.best': 'best {percent}%',
   'parent.gateTitle': 'Arriving and leaving',
   'parent.gateNote': 'The first arrival and the last departure each day.',
   'parent.gateEmpty': 'Nothing recorded at the gate yet.',
@@ -68,6 +120,8 @@ export const en = {
     + 'to agree first, and you will see their answer here.',
   'parentReq.pickup': 'Collecting them early',
   'parentReq.absence': 'Explaining an absence',
+  'parentReq.addressTo': 'Who should decide',
+  'parentReq.addressToHint': 'Choose who to ask',
   'parentReq.reason': 'Why',
   'parentReq.pickupHint': 'Dentist at two o’clock',
   'parentReq.absenceHint': 'She had malaria and was at the clinic',
@@ -339,6 +393,7 @@ export const en = {
   'home.passRate': 'Pass rate',
   'home.dormitories': 'Dormitories',
   'home.callRegister': 'Call the register',
+  'home.curriculumGuide': 'Curriculum guide',
   'home.recordMarks': 'Record marks',
   'home.registerStudent': 'Register a student',
   'home.recentStudents': 'Recent students',

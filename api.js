@@ -437,6 +437,16 @@ export const schoolApi = {
   entitlements: () => get('/api/entitlements').then((d) => (d && d.data) || null),
 
   /**
+   * The competency-based curriculum guide, cut to this school's level and country.
+   *
+   * Fetched rather than bundled, and the reason is written at the top of the server's
+   * `curriculum/uganda-cbc.mjs`: NCDC is revising the curriculum and UNEB has changed the shape
+   * of a result twice in two sittings, so a copy compiled into this app would be corrected only
+   * by a release every school has to install.
+   */
+  curriculumGuide: () => post('/api/functions/curriculum-guide', { action: 'guide' }),
+
+  /**
    * The school in figures, cut to whoever is asking.
    *
    * The server sends only the sections this reader may see — a teacher's answer has no `fees` key at
@@ -522,10 +532,29 @@ export const schoolApi = {
 
   /* Asking the office, which is not the same as being granted anything — see the server's
      parent_requests table. Nothing here opens a gate. */
-  parentAsk: ({ studentId, kind, reason, requestedFor }) =>
+  parentAsk: ({ studentId, kind, reason, requestedFor, addressedTo }) =>
     post('/api/functions/parent', {
-      action: 'request', studentId, kind, reason, requestedFor,
+      action: 'request', studentId, kind, reason, requestedFor, addressedTo,
     }),
+
+  /**
+   * Who a guardian may address a request to.
+   *
+   * Posts, not people: the list is built from the posts this school actually has somebody
+   * approved in, so a parent can never address a request to an empty desk. Names are not in it —
+   * "the Head Teacher" identifies the desk without identifying the person, and a guardian account
+   * is the least protected in a school.
+   */
+  /* The office side of the same table: what parents have asked, and answering it. Gated on the
+     server to the head teacher, the administrator and the Director of Studies. */
+  pendingParentRequests: () =>
+    post('/api/functions/parent-requests', { action: 'pending' }),
+
+  decideParentRequest: ({ requestId, approve, note }) =>
+    post('/api/functions/parent-requests', { action: 'decide', requestId, approve, note }),
+
+  parentApprovers: () =>
+    post('/api/functions/parent', { action: 'approvers' }).then((d) => (d && d.approvers) || []),
 
   markClasses: () =>
     post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
