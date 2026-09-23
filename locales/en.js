@@ -62,6 +62,7 @@ export const en = {
   'curriculum.otherCountry':
     'This school is not set to a Ugandan grading scheme, so this guide describes another country’s curriculum. It is here to read, not to follow.',
   'home.parentRequests': 'Parent requests',
+  'home.parentRequestsWaiting': { one: '{count} waiting', other: '{count} waiting' },
   'parentQueue.title': 'Parent requests',
   'parentQueue.loading': 'Loading requests…',
   'parentQueue.failed': 'The requests could not be loaded.',

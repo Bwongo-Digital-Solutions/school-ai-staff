@@ -553,6 +553,15 @@ export const schoolApi = {
   decideParentRequest: ({ requestId, approve, note }) =>
     post('/api/functions/parent-requests', { action: 'decide', requestId, approve, note }),
 
+  /* Just the figure behind the badge, not the queue. Asked on every launch and foreground, from
+     every office phone in the school, so it is deliberately a different endpoint from the list
+     above rather than `pendingParentRequests().length`: one grouped count against one table,
+     instead of the full join with students and guardians. Answers for anybody signed in — zeros
+     for a reader who may not decide — so the home screen never has to handle a refusal. */
+  parentRequestCount: () =>
+    post('/api/functions/parent-requests', { action: 'count' })
+      .then((d) => ({ total: (d && d.total) || 0, mine: (d && d.mine) || 0 })),
+
   parentApprovers: () =>
     post('/api/functions/parent', { action: 'approvers' }).then((d) => (d && d.approvers) || []),
 

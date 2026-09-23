@@ -13,7 +13,9 @@ import { ThemeProvider, screenTopInset, useTheme } from './theme';
 import { BrandingProvider, useBranding } from './branding';
 import { api, schoolApi, ApiError, flushOutbox } from './api';
 import { onPendingChange } from './outbox';
-import { allowedTabs, canPrintDocuments, featureOn, hasRoster, isAskari, landingTab } from './roles';
+import {
+  allowedTabs, canDecideParentRequests, canPrintDocuments, featureOn, hasRoster, isAskari, landingTab,
+} from './roles';
 import { useNewMessageChime } from './notify';
 import TabBar from './components/TabBar';
 import SettingsSheet from './components/SettingsSheet';
@@ -63,6 +65,9 @@ const INBOX_POLL_MS = 60000;
 const EMPTY_SCHOOL = { students: [], fees: [] };
 const EMPTY_INBOX = { messages: [], unread: 0, loaded: false, error: '' };
 const EMPTY_PENDING_GATE = { rows: [], count: 0, loaded: false };
+/* What parents have asked and nobody has answered. `mine` is the share addressed to this reader's
+   own post; the badge shows `total`, because any of the three posts may answer any of them. */
+const EMPTY_PARENT_REQUESTS = { total: 0, mine: 0, loaded: false };
 const EMPTY_CHAT = {
   conversationId: null,
   messages: [],
@@ -231,6 +236,7 @@ function Root() {
 
   const [inbox, setInbox] = useState(EMPTY_INBOX);
   const [pendingGate, setPendingGate] = useState(EMPTY_PENDING_GATE);
+  const [parentRequests, setParentRequests] = useState(EMPTY_PARENT_REQUESTS);
   const [chat, setChat] = useState(EMPTY_CHAT);
 
   /* The gate keeper's chosen action and the card they just scanned. Nothing is written
@@ -373,6 +379,25 @@ function Root() {
     }
   }, [user]);
 
+  /* How many parent requests are waiting, for the badge on the Home button.
+
+     Asked only of the three posts that can answer one, and only where the school still has the
+     portal on. The server would hand anyone else zeros and refuse a switched-off school outright,
+     but a cook's phone asking a question whose answer is always zero is a request every foreground
+     for nothing. */
+  const refreshParentRequests = useCallback(async () => {
+    if (!user || !canDecideParentRequests(user) || !api.configured()) return;
+    if (!featureOn(features, 'parent_portal')) return;
+    try {
+      const counts = await schoolApi.parentRequestCount();
+      setParentRequests({ ...counts, loaded: true });
+    } catch {
+      /* Left as it was, like the gate's count above: a badge that blanks on one failed poll is
+         worse than a badge that is a minute stale, because the reader cannot tell the difference
+         between "nothing waiting" and "we could not ask". */
+    }
+  }, [user, features]);
+
   const goToTab = useCallback(
     (next) => {
       const target = allowedTabs(user, features).includes(next) ? next : landingTab(user, features);
@@ -489,6 +514,7 @@ function Root() {
     setError('');
     setInbox(EMPTY_INBOX);
     setPendingGate(EMPTY_PENDING_GATE);
+    setParentRequests(EMPTY_PARENT_REQUESTS);
     setChat(EMPTY_CHAT);
     setGateAction(null);
     setGateCard(null);
@@ -532,6 +558,7 @@ function Root() {
     setTab(landingTab(nextUser, features));
     setInbox(EMPTY_INBOX);
     setPendingGate(EMPTY_PENDING_GATE);
+    setParentRequests(EMPTY_PARENT_REQUESTS);
     setChat(EMPTY_CHAT);
     setUser(nextUser);
   }, [refreshBranding, features]);
@@ -589,8 +616,12 @@ function Root() {
   /* Also refreshed on every return to the root, so a decision made on the gate list is
      reflected the moment the officer comes back from it. */
   useEffect(() => {
-    if (user && atRoot) refreshPendingGate();
-  }, [user, atRoot, route.name, refreshPendingGate]);
+    if (!user || !atRoot) return;
+    refreshPendingGate();
+    /* The same reasoning for the parent queue: answering a request on that screen must take it
+       off the badge the moment the reader comes back, not at the next poll. */
+    refreshParentRequests();
+  }, [user, atRoot, route.name, refreshPendingGate, refreshParentRequests]);
 
   /* Keeps the bell honest from any tab. Paused while the app is in the background —
      nobody is looking, and a phone in a pocket should not be making requests. */
@@ -603,6 +634,7 @@ function Root() {
       timer = setInterval(() => {
         refreshInbox();
         refreshPendingGate();
+        refreshParentRequests();
         /* The app can be open and still while the signal returns — standing at a gate, screen on,
            nobody touching it. Without this the queue would wait for the next foreground event that
            may not come for hours. */
@@ -628,6 +660,7 @@ function Root() {
       if (state === 'active') {
         refreshInbox();
         refreshPendingGate();
+        refreshParentRequests();
         lookForUpdate();
         lookForFeatures();
         lookForOverview();
@@ -644,7 +677,8 @@ function Root() {
       stop();
       sub.remove();
     };
-  }, [user, refreshInbox, refreshPendingGate, lookForUpdate, lookForFeatures, lookForOverview, drainOutbox]);
+  }, [user, refreshInbox, refreshPendingGate, refreshParentRequests, lookForUpdate, lookForFeatures,
+      lookForOverview, drainOutbox]);
 
   useNewMessageChime(inbox);
 
@@ -719,6 +753,7 @@ function Root() {
             unread={inbox.unread}
             pendingGateCount={pendingGate.count}
             pendingGateLoaded={pendingGate.loaded}
+            parentRequestCount={parentRequests.total}
             onOpenPendingGate={() => push({ name: 'pendinggate' })}
             onOpenGateBoard={() => push({ name: 'gateboard' })}
             onOpenMatron={() => push({ name: 'matron' })}
