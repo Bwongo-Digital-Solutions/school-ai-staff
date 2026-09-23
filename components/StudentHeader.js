@@ -6,8 +6,12 @@ import Badge from './Badge';
 
 /* Who the card is about. The card screen and the gate's confirmation both open with it, so
    the officer about to let somebody through is looking at the same identity block the
-   office sees. */
-export default function StudentHeader({ student, badge, style }) {
+   office sees.
+
+   `sub` overrides the second line. The default spells "Grade" in English, which is right for the
+   staff screens as they stand; a translated caller passes its own line through `classOf` rather
+   than showing a French-speaking parent an English word for their child's class. */
+export default function StudentHeader({ student, badge, sub, style }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -25,7 +29,7 @@ export default function StudentHeader({ student, badge, style }) {
           {name}
         </Text>
         <Text style={styles.sub} numberOfLines={1}>
-          {`${(student && student.student_id) || '—'} · Grade ${grade}${section}`}
+          {sub || `${(student && student.student_id) || '—'} · Grade ${grade}${section}`}
         </Text>
       </View>
       {badge ? <Badge label={badge.label} tone={badge.tone} /> : null}

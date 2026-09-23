@@ -13,13 +13,24 @@
  * wording says so plainly in both languages: a parent who believes collection is arranged and
  * arrives to find the askari has no record of it is worse served than one told somebody has to
  * agree first.
+ *
+ * ## Only theme tokens, and only ones that exist
+ *
+ * This screen was written against `colors.muted`, `colors.primary` and `colors.onPrimary`, none of
+ * which are in either palette — no other file in the app names them. React Native has no fallback
+ * for an undefined colour: it paints the text black, so on the dark theme a parent's child's ID,
+ * every explanatory note and every empty state rendered black on a near-black card, and the
+ * selected chip had no fill at all. Secondary text is `neutral[500]`, quieter text `neutral[400]`,
+ * hairlines `neutral[800]` / `neutral[900]`, and the accent is `accent` / the `accentRamp`. Both
+ * ramps are reversed between the palettes (see theme.js), which is what makes one rule read
+ * correctly in both themes — so a token is always right where a literal would be right once.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { PaperPlaneTilt } from 'phosphor-react-native';
 
-import { useTheme, spacing, fonts } from '../theme';
+import { useTheme, radius, spacing, fonts } from '../theme';
 import { schoolApi, ApiError } from '../api';
 import { alertSuccess, alertError } from '../alerts';
 import { classOf, dateTime, money } from '../format';
@@ -27,9 +38,14 @@ import { useT } from '../i18n';
 import Screen from '../components/Screen';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
+import Badge from '../components/Badge';
 import Button from '../components/Button';
 import Field from '../components/Field';
+import StatTile from '../components/StatTile';
+import DetailRow from '../components/DetailRow';
+import SectionLabel from '../components/SectionLabel';
 import StateBlock from '../components/StateBlock';
+import StudentHeader from '../components/StudentHeader';
 
 const clock = (value) => {
   const date = new Date(value);
@@ -37,6 +53,32 @@ const clock = (value) => {
     ? ''
     : date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 };
+
+/* The office's answer, in the colour the rest of the app uses for that answer. Anything the
+   server adds later falls through to neutral rather than to an undefined tone. */
+const STATUS_TONE = {
+  pending: 'amber',
+  approved: 'green',
+  declined: 'red',
+  cancelled: 'neutral',
+};
+
+/* One option in a two- or three-way switch, drawn the way ScannerScreen and AssistantScreen draw
+   theirs, so a parent's controls look like the rest of the app rather than like this screen. */
+function Segment({ label, active, onPress, styles }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.segment, active && styles.segmentActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 export default function ChildScreen() {
   const { colors } = useTheme();
@@ -46,13 +88,14 @@ export default function ChildScreen() {
      screen with no tab bar, for guardians only, because this is the only screen they get. Every
      other screen in this app destructures; this one did not. */
   const { t } = useT();
-  const s = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [children, setChildren] = useState([]);
   const [selected, setSelected] = useState(null);
   const [overview, setOverview] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState('pickup');
   const [reason, setReason] = useState('');
@@ -88,6 +131,14 @@ export default function ChildScreen() {
 
   useEffect(() => { load(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* Pull-to-refresh keeps its own flag. Driving the spinner from `loading` put it on screen during
+     the first load as well, so the screen opened mid-refresh over an empty page. */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load(selected);
+    setRefreshing(false);
+  }, [load, selected]);
+
   const ask = async () => {
     if (!reason.trim()) return;
     setBusy(true);
@@ -116,148 +167,199 @@ export default function ChildScreen() {
   const fees = (overview && overview.fees) || null;
   const academics = (overview && overview.academics) || null;
   const attendance = (overview && overview.attendance) || null;
+  const gateDays = overview && overview.gate ? overview.gate.days.slice(0, 7) : [];
+  const health = (overview && overview.health) || [];
+  const discipline = (overview && overview.discipline) || [];
+
+  /* Built as a list rather than three conditional elements so the last one can be widened when
+     the count is odd. A two-column grid leaves a lone tile sitting in half a row beside nothing,
+     which reads as a figure that failed to load rather than as the last of three. */
+  const tiles = [];
+  if (fees) {
+    tiles.push({
+      key: 'balance',
+      label: t('parent.balance'),
+      value: money(fees.balance_due || 0, fees.currency),
+    });
+  }
+  if (attendance) {
+    tiles.push({
+      key: 'attendance',
+      label: t('parent.attendance'),
+      value: `${Math.round(attendance.rate || 0)}%`,
+    });
+  }
+  if (academics && academics.average !== undefined) {
+    tiles.push({
+      key: 'average',
+      label: t('parent.average'),
+      value: `${Math.round(Number(academics.average))}%`,
+    });
+  }
 
   return (
     <Screen>
-      <ScreenHeader title={child ? child.full_name : t('parent.title')} />
-      {child && <Text style={s.who}>{`${child.student_id} · ${classOf(child)}`}</Text>}
+      {/* The title stays put and the child's name rides in the identity block below, the way the
+          staff student card does it. Putting the name in the header left its ID line pinned in the
+          gap above the scroll, colliding with whatever had scrolled up behind it. */}
+      <ScreenHeader title={t('parent.title')} />
 
       <ScrollView
-        contentContainerStyle={s.body}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => load(selected)} />}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.neutral[400]} />
+        }
       >
+        {child ? (
+          <StudentHeader
+            student={child}
+            sub={`${child.student_id} · ${classOf(child)}`}
+            style={styles.identity}
+          />
+        ) : null}
+
         {/* Only where a family has more than one child at this school. */}
         {children.length > 1 && (
-          <View style={s.switcher}>
+          <View style={styles.segmented}>
             {children.map((one) => (
-              <Pressable
+              <Segment
                 key={one.id}
+                label={one.full_name}
+                active={one.id === selected}
                 onPress={() => load(one.id)}
-                style={[s.chip, one.id === selected && s.chipOn]}
-              >
-                <Text style={[s.chipText, one.id === selected && s.chipTextOn]}>
-                  {one.full_name}
-                </Text>
-              </Pressable>
+                styles={styles}
+              />
             ))}
           </View>
         )}
 
         {/* ------------------------------------------------------------------ the figures */}
-        <View style={s.tiles}>
-          {fees && (
-            <Card style={s.tile}>
-              <Text style={s.tileLabel}>{t('parent.balance')}</Text>
-              <Text style={s.tileValue}>{money(fees.balance_due || 0, fees.currency)}</Text>
-              <Text style={s.tileNote}>
+        {tiles.length > 0 && (
+          <>
+            <SectionLabel style={styles.firstLabel}>{t('parent.overview')}</SectionLabel>
+            <View style={styles.statGrid}>
+              {tiles.map((tile, index) => (
+                <StatTile
+                  key={tile.key}
+                  variant="gradient"
+                  label={tile.label}
+                  value={tile.value}
+                  style={
+                    tiles.length % 2 === 1 && index === tiles.length - 1 ? styles.wideTile : null
+                  }
+                />
+              ))}
+            </View>
+            {fees ? (
+              <Text style={styles.meta}>
                 {t('parent.paidOf', { paid: money(fees.total_paid || 0, fees.currency) })}
               </Text>
-            </Card>
-          )}
-          {attendance && (
-            <Card style={s.tile}>
-              <Text style={s.tileLabel}>{t('parent.attendance')}</Text>
-              <Text style={s.tileValue}>{`${Math.round(attendance.rate || 0)}%`}</Text>
-            </Card>
-          )}
-          {academics && academics.average !== undefined && (
-            <Card style={s.tile}>
-              <Text style={s.tileLabel}>{t('parent.average')}</Text>
-              <Text style={s.tileValue}>{`${Math.round(Number(academics.average))}%`}</Text>
-              {academics.position !== undefined && (
-                <Text style={s.tileNote}>
-                  {t('parent.position', { position: academics.position, of: academics.class_size || 0 })}
-                </Text>
-              )}
-            </Card>
-          )}
-        </View>
+            ) : null}
+            {academics && academics.position !== undefined ? (
+              <Text style={styles.meta}>
+                {t('parent.position', { position: academics.position, of: academics.class_size || 0 })}
+              </Text>
+            ) : null}
+          </>
+        )}
 
         {/* ------------------------------------------------------------------ the gate */}
         {overview && overview.gate && (
-          <Card>
-            <Text style={s.cardTitle}>{t('parent.gateTitle')}</Text>
-            <Text style={s.cardNote}>{t('parent.gateNote')}</Text>
-            {overview.gate.days.length === 0 ? (
-              <Text style={s.empty}>{t('parent.gateEmpty')}</Text>
-            ) : (
-              overview.gate.days.slice(0, 7).map((day) => (
-                <View key={day.day} style={s.row}>
-                  <Text style={s.rowMain}>{dateTime(day.day)}</Text>
-                  <Text style={s.rowNote}>
-                    {day.arrived ? t('parent.arrived', { time: clock(day.arrived) }) : t('parent.noArrival')}
-                    {day.left ? ` · ${t('parent.left', { time: clock(day.left) })}` : ''}
-                  </Text>
-                </View>
-              ))
-            )}
-          </Card>
+          <>
+            <SectionLabel>{t('parent.gateTitle')}</SectionLabel>
+            <Card style={gateDays.length ? styles.listCard : styles.sectionCard}>
+              {gateDays.length === 0 ? (
+                <>
+                  <Text style={styles.explainerTop}>{t('parent.gateNote')}</Text>
+                  <Text style={styles.empty}>{t('parent.gateEmpty')}</Text>
+                </>
+              ) : (
+                gateDays.map((day, index) => (
+                  <DetailRow
+                    key={day.day}
+                    title={dateTime(day.day)}
+                    value={
+                      (day.arrived
+                        ? t('parent.arrived', { time: clock(day.arrived) })
+                        : t('parent.noArrival')) +
+                      (day.left ? ` · ${t('parent.left', { time: clock(day.left) })}` : '')
+                    }
+                    isLast={index === gateDays.length - 1}
+                  />
+                ))
+              )}
+            </Card>
+            {gateDays.length ? <Text style={styles.quietNote}>{t('parent.gateNote')}</Text> : null}
+          </>
         )}
 
         {/* ------------------------------------------------------------------ sick bay */}
         {overview && overview.health && (
-          <Card>
-            <Text style={s.cardTitle}>{t('parent.healthTitle')}</Text>
-            {overview.health.length === 0 ? (
-              <Text style={s.empty}>{t('parent.healthEmpty')}</Text>
-            ) : (
-              overview.health.map((visit) => (
-                <View key={visit.id} style={s.row}>
-                  <Text style={s.rowMain}>{visit.complaint}</Text>
-                  <Text style={s.rowNote}>
-                    {dateTime(visit.admitted_at)}
-                    {visit.treatment ? ` · ${visit.treatment}` : ''}
-                  </Text>
-                </View>
-              ))
-            )}
-          </Card>
+          <>
+            <SectionLabel>{t('parent.healthTitle')}</SectionLabel>
+            <Card style={health.length ? styles.listCard : styles.sectionCard}>
+              {health.length === 0 ? (
+                <Text style={styles.empty}>{t('parent.healthEmpty')}</Text>
+              ) : (
+                health.map((visit, index) => (
+                  <DetailRow
+                    key={visit.id}
+                    title={visit.complaint}
+                    value={dateTime(visit.admitted_at) + (visit.treatment ? ` · ${visit.treatment}` : '')}
+                    isLast={index === health.length - 1}
+                  />
+                ))
+              )}
+            </Card>
+          </>
         )}
 
         {/* ------------------------------------------------------------------ behaviour */}
         {overview && overview.discipline && (
-          <Card>
-            <Text style={s.cardTitle}>{t('parent.disciplineTitle')}</Text>
-            {overview.discipline.length === 0 ? (
-              <Text style={s.empty}>{t('parent.disciplineEmpty')}</Text>
-            ) : (
-              overview.discipline.map((record) => (
-                <View key={record.id} style={s.row}>
-                  <Text style={s.rowMain}>{record.category}</Text>
-                  <Text style={s.rowNote}>
-                    {dateTime(record.incident_date)} · {record.description}
-                  </Text>
-                </View>
-              ))
-            )}
-          </Card>
+          <>
+            <SectionLabel>{t('parent.disciplineTitle')}</SectionLabel>
+            <Card style={discipline.length ? styles.listCard : styles.sectionCard}>
+              {discipline.length === 0 ? (
+                <Text style={styles.empty}>{t('parent.disciplineEmpty')}</Text>
+              ) : (
+                discipline.map((record, index) => (
+                  <DetailRow
+                    key={record.id}
+                    title={record.category}
+                    value={`${dateTime(record.incident_date)} · ${record.description}`}
+                    isLast={index === discipline.length - 1}
+                  />
+                ))
+              )}
+            </Card>
+          </>
         )}
 
         {/* ------------------------------------------------------------------ asking */}
-        <Card>
-          <Text style={s.cardTitle}>{t('parentReq.title')}</Text>
-          <Text style={s.cardNote}>{t('parentReq.note')}</Text>
+        <SectionLabel>{t('parentReq.title')}</SectionLabel>
+        <Card style={styles.sectionCard}>
+          <Text style={styles.explainerTop}>{t('parentReq.note')}</Text>
 
-          <View style={s.switcher}>
+          <View style={styles.segmented}>
             {['pickup', 'absence'].map((option) => (
-              <Pressable
+              <Segment
                 key={option}
+                label={t(`parentReq.${option}`)}
+                active={option === kind}
                 onPress={() => setKind(option)}
-                style={[s.chip, option === kind && s.chipOn]}
-              >
-                <Text style={[s.chipText, option === kind && s.chipTextOn]}>
-                  {t(`parentReq.${option}`)}
-                </Text>
-              </Pressable>
+                styles={styles}
+              />
             ))}
           </View>
 
-          <Field
-            label={t('parentReq.reason')}
-            value={reason}
-            onChangeText={setReason}
-            placeholder={kind === 'pickup' ? t('parentReq.pickupHint') : t('parentReq.absenceHint')}
-          />
+          <View style={styles.formField}>
+            <Field
+              label={t('parentReq.reason')}
+              value={reason}
+              onChangeText={setReason}
+              placeholder={kind === 'pickup' ? t('parentReq.pickupHint') : t('parentReq.absenceHint')}
+            />
+          </View>
 
           {/* `label`, not `title`: Button takes label, and the wrong prop name rendered a button
               with no words on it rather than failing anywhere visible. */}
@@ -265,20 +367,30 @@ export default function ChildScreen() {
             label={t('parentReq.send')}
             icon={PaperPlaneTilt}
             onPress={ask}
+            loading={busy}
             disabled={busy || !reason.trim()}
+            style={styles.blockButton}
           />
-
-          {requests.map((request) => (
-            <View key={request.id} style={s.row}>
-              <Text style={s.rowMain}>{t(`parentReq.${request.kind}`)}</Text>
-              <Text style={s.rowNote}>
-                {request.reason}
-                {request.decided_note ? ` · ${request.decided_note}` : ''}
-              </Text>
-              <Text style={s.status}>{t(`parentReq.status.${request.status}`)}</Text>
-            </View>
-          ))}
         </Card>
+
+        {requests.length ? (
+          <Card style={styles.listCard}>
+            {requests.map((request, index) => (
+              <DetailRow
+                key={request.id}
+                title={t(`parentReq.${request.kind}`)}
+                value={request.reason + (request.decided_note ? ` · ${request.decided_note}` : '')}
+                isLast={index === requests.length - 1}
+                action={
+                  <Badge
+                    label={t(`parentReq.status.${request.status}`)}
+                    tone={STATUS_TONE[request.status] || 'neutral'}
+                  />
+                }
+              />
+            ))}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -286,29 +398,97 @@ export default function ChildScreen() {
 
 const createStyles = (colors) =>
   StyleSheet.create({
-    body: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2 },
-    who: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted, paddingHorizontal: spacing.lg },
-    switcher: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    chip: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: colors.neutral[200],
+    scrollContent: {
+      paddingHorizontal: spacing.xxl,
+      paddingBottom: spacing.xxl * 2,
     },
-    chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text },
-    chipTextOn: { color: colors.onPrimary || '#fff' },
-    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    tile: { flexGrow: 1, flexBasis: '45%' },
-    tileLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.muted },
-    tileValue: { fontFamily: fonts.bold, fontSize: 22, color: colors.text },
-    tileNote: { fontFamily: fonts.regular, fontSize: 12, color: colors.muted },
-    cardTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-    cardNote: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, color: colors.muted, marginBottom: spacing.sm },
-    row: { paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.neutral[200], gap: 2 },
-    rowMain: { fontFamily: fonts.bold, fontSize: 14, color: colors.text },
-    rowNote: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
-    status: { fontFamily: fonts.regular, fontSize: 12, color: colors.primary },
-    empty: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, paddingVertical: spacing.md, textAlign: 'center' },
+    identity: {
+      marginBottom: spacing.md,
+    },
+    // SectionLabel carries its own top margin; the first one sits under the identity block.
+    firstLabel: {
+      marginTop: spacing.xl,
+    },
+    sectionCard: {
+      padding: spacing.lg,
+    },
+    listCard: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: 0,
+    },
+    statGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: spacing.lg,
+    },
+    // StatTile is 48% wide so two sit per row; an odd last one takes the whole row instead.
+    wideTile: {
+      flexBasis: '100%',
+    },
+    meta: {
+      fontFamily: fonts.regular,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: colors.neutral[500],
+      marginTop: spacing.md,
+    },
+    quietNote: {
+      fontFamily: fonts.regular,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: colors.neutral[400],
+      marginTop: spacing.md,
+    },
+    explainerTop: {
+      fontFamily: fonts.regular,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: colors.neutral[500],
+      marginBottom: spacing.lg,
+    },
+    /* Left-aligned, like the staff card's own "No roll call recorded yet." A centred line under a
+       left-aligned explainer put two alignments in one small card. */
+    empty: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.neutral[500],
+      paddingVertical: spacing.xs,
+    },
+    segmented: {
+      flexDirection: 'row',
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.neutral[800],
+      backgroundColor: colors.surface,
+      padding: 3,
+      marginTop: spacing.lg,
+    },
+    segment: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+    },
+    segmentActive: {
+      backgroundColor: colors.accentRamp[900],
+    },
+    segmentLabel: {
+      fontFamily: fonts.medium,
+      fontSize: 13,
+      color: colors.neutral[500],
+    },
+    segmentLabelActive: {
+      color: colors.accentRamp[200],
+    },
+    formField: {
+      marginTop: spacing.lg,
+    },
+    blockButton: {
+      marginTop: spacing.lg,
+      alignSelf: 'stretch',
+    },
   });
