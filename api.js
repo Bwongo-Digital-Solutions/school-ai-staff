@@ -437,6 +437,16 @@ export const schoolApi = {
   entitlements: () => get('/api/entitlements').then((d) => (d && d.data) || null),
 
   /**
+   * The competency-based curriculum guide, cut to this school's level and country.
+   *
+   * Fetched rather than bundled, and the reason is written at the top of the server's
+   * `curriculum/uganda-cbc.mjs`: NCDC is revising the curriculum and UNEB has changed the shape
+   * of a result twice in two sittings, so a copy compiled into this app would be corrected only
+   * by a release every school has to install.
+   */
+  curriculumGuide: () => post('/api/functions/curriculum-guide', { action: 'guide' }),
+
+  /**
    * The school in figures, cut to whoever is asking.
    *
    * The server sends only the sections this reader may see — a teacher's answer has no `fees` key at

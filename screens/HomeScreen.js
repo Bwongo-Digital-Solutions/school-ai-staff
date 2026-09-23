@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, ScrollView } from 'react-native';
 import {
+  BookOpen,
   Bed,
   CalendarCheck,
   ChartLineUp,
@@ -102,6 +103,7 @@ export default function HomeScreen({
   pendingGateLoaded = false,
   onRegisterStudent,
   onRecordMarks,
+  onOpenCurriculum,
   onRetry,
   onScanPress,
   onOpenStudent,
@@ -248,6 +250,19 @@ export default function HomeScreen({
                     style={styles.rollCallButton}
                   />
                 ) : null}
+
+                {/* Reference reading about the national curriculum. Ungated on purpose — it is
+                    the same text for every school, holds no student data, and a teacher whose
+                    school has switched off the mark book still has to know how the 20% is
+                    composed. Offered to everyone who sees this block, which is the teaching
+                    roles. */}
+                <Button
+                  label={t('home.curriculumGuide')}
+                  icon={BookOpen}
+                  variant="secondary"
+                  onPress={onOpenCurriculum}
+                  style={styles.rollCallButton}
+                />
 
                 {/* Enrolling is the office's job, so only they are offered it. */}
                 {canRegisterStudents(user) && featureOn(features, 'registration') ? (

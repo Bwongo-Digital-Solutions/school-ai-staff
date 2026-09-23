@@ -35,6 +35,21 @@ export const fr = {
 
   /* ------------------------------------------------------- l'espace parents --- */
   'role.parent': 'Parent ou tuteur',
+  'curriculum.title': 'Guide du programme',
+  'curriculum.subtitle':
+    "Ce que le ministère de l'Éducation et des Sports entend par programme axé sur les compétences, et ce qu'il attend de vous en classe.",
+  'curriculum.loading': 'Ouverture du guide…',
+  'curriculum.failed': "Le guide n'a pas pu être ouvert.",
+  'curriculum.revised': 'Révisé le {date}',
+  'curriculum.notASubstitute':
+    "Un résumé, qui ne remplace ni le programme NCDC de votre matière ni la circulaire UNEB en vigueur.",
+  'curriculum.basedOn': "D'après :",
+  'curriculum.sources': 'Nos sources',
+  'curriculum.sourcesNote': "Vérifiez tout ce que vous direz à un parent ou à un inspecteur.",
+  'curriculum.officialSources': 'Sources officielles',
+  'curriculum.reportingSources': 'Articles de presse',
+  'curriculum.otherCountry':
+    "Cette école n'utilise pas un barème ougandais : ce guide décrit donc le programme d'un autre pays. Il est ici à titre de lecture, non de consigne.",
   'parent.title': 'Votre enfant',
   'parent.pendingTitle': "En attente de validation par l'école",
   'parent.pendingBody':
@@ -46,6 +61,19 @@ export const fr = {
   'parent.average': 'Moyenne',
   'parent.position': 'Rang {position} sur {of}',
   'parent.paidOf': '{paid} déjà payés',
+  'parent.progressTitle': 'Ses résultats',
+  'parent.progressNote':
+    "Toutes les notes enregistrées par l'école, la plus récente en dernier. Une matière avec une seule note n'a pas encore de tendance.",
+  'parent.progressEmpty': 'Aucune note enregistrée pour le moment.',
+  'parent.progressMarks': { one: '{count} note enregistrée', other: '{count} notes enregistrées' },
+  'parent.progressAverage': 'Moyenne sur toutes les notes',
+  'parent.progressRounds': 'Chaque barre représente une journée de notation',
+  'parent.up': 'en hausse de {change}',
+  'parent.down': 'en baisse de {change}',
+  'parent.steady': 'stable',
+  'parent.firstMark': 'première note',
+  'parent.subjectMarks': { one: '{count} note', other: '{count} notes' },
+  'parent.best': 'meilleure note : {percent} %',
   'parent.gateTitle': 'Arrivées et sorties',
   'parent.gateNote': 'La première arrivée et le dernier départ de chaque jour.',
   'parent.gateEmpty': 'Rien enregistré au portail pour le moment.',
@@ -349,6 +377,7 @@ export const fr = {
   'home.passRate': 'Taux de réussite',
   'home.dormitories': 'Dortoirs',
   'home.callRegister': "Faire l'appel",
+  'home.curriculumGuide': 'Guide du programme',
   'home.recordMarks': 'Saisir les notes',
   'home.registerStudent': 'Inscrire un élève',
   'home.recentStudents': 'Élèves récents',
