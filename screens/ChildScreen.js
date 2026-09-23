@@ -41,6 +41,7 @@ import Card from '../components/Card';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import Field from '../components/Field';
+import Select from '../components/Select';
 import StatTile from '../components/StatTile';
 import DetailRow from '../components/DetailRow';
 import SectionLabel from '../components/SectionLabel';
@@ -178,6 +179,11 @@ export default function ChildScreen() {
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState('pickup');
   const [reason, setReason] = useState('');
+  /* Who the request is addressed to. Posts, not people — the server builds the list from the posts
+     this school actually has somebody approved in, so a parent cannot address a collection to an
+     empty desk and then wait for an answer that was never coming. */
+  const [approvers, setApprovers] = useState([]);
+  const [addressedTo, setAddressedTo] = useState('');
 
   const load = useCallback(async (childId) => {
     setLoading(true);
@@ -210,6 +216,21 @@ export default function ChildScreen() {
 
   useEffect(() => { load(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* Fetched once. A school that appoints a Director of Studies mid-term needs a parent to reopen
+     the app to see them, which is the right trade against asking on every render. */
+  useEffect(() => {
+    let cancelled = false;
+    schoolApi.parentApprovers()
+      .then((list) => {
+        if (cancelled) return;
+        setApprovers(list);
+        // Pre-selected only when there is exactly one, where a dropdown would be a formality.
+        if (list.length === 1) setAddressedTo(list[0].key);
+      })
+      .catch(() => { /* the form still works unaddressed — the office sees it either way */ });
+    return () => { cancelled = true; };
+  }, []);
+
   /* Pull-to-refresh keeps its own flag. Driving the spinner from `loading` put it on screen during
      the first load as well, so the screen opened mid-refresh over an empty page. */
   const refresh = useCallback(async () => {
@@ -222,7 +243,7 @@ export default function ChildScreen() {
     if (!reason.trim()) return;
     setBusy(true);
     try {
-      await schoolApi.parentAsk({ studentId: selected, kind, reason: reason.trim() });
+      await schoolApi.parentAsk({ studentId: selected, kind, reason: reason.trim(), addressedTo });
       setReason('');
       alertSuccess(t('parentReq.sent'), t('parentReq.sentBody'));
       setRequests(await schoolApi.parentRequests(selected));
@@ -250,6 +271,12 @@ export default function ChildScreen() {
   const health = (overview && overview.health) || [];
   const discipline = (overview && overview.discipline) || [];
   const performance = (overview && overview.performance) || null;
+
+  /* The post a request went to, in this school's own words. Falls back to the stored key rather
+     than to nothing: a school that has since abolished the post should still show where an old
+     request was sent. */
+  const approverLabel = (key) =>
+    (approvers.find((a) => a.key === key) || {}).label || key.replace(/_/g, ' ');
 
   /* Built as a list rather than three conditional elements so the last one can be widened when
      the count is odd. A two-column grid leaves a lone tile sitting in half a row beside nothing,
@@ -486,6 +513,21 @@ export default function ChildScreen() {
             />
           </View>
 
+          {/* Who to ask. Drawn only when the school has somebody to ask and the choice is real —
+              with a single post the dropdown would be a formality, and it is pre-selected instead. */}
+          {approvers.length > 1 && (
+            <View style={styles.formField}>
+              <Select
+                label={t('parentReq.addressTo')}
+                title={t('parentReq.addressTo')}
+                placeholder={t('parentReq.addressToHint')}
+                value={addressedTo}
+                onChange={setAddressedTo}
+                options={approvers.map((a) => ({ value: a.key, label: a.label }))}
+              />
+            </View>
+          )}
+
           {/* `label`, not `title`: Button takes label, and the wrong prop name rendered a button
               with no words on it rather than failing anywhere visible. */}
           <Button
@@ -503,7 +545,11 @@ export default function ChildScreen() {
             {requests.map((request, index) => (
               <DetailRow
                 key={request.id}
-                title={t(`parentReq.${request.kind}`)}
+                title={
+                  request.addressed_to
+                    ? `${t(`parentReq.${request.kind}`)} · ${approverLabel(request.addressed_to)}`
+                    : t(`parentReq.${request.kind}`)
+                }
                 value={request.reason + (request.decided_note ? ` · ${request.decided_note}` : '')}
                 isLast={index === requests.length - 1}
                 action={

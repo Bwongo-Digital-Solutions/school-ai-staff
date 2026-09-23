@@ -19,7 +19,8 @@ import { useBranding } from '../branding';
 import { schoolApi } from '../api';
 import { amount, money, percent } from '../format';
 import {
-  canRegisterStudents, featureOn, hasRoster, isAskari, isMatron, roleLabel, scanPurposeKey,
+  canDecideParentRequests, canRegisterStudents, featureOn, hasRoster, isAskari, isMatron,
+  roleLabel, scanPurposeKey,
 } from '../roles';
 import { useT } from '../i18n';
 import { GATE_ACTIONS } from './GateConfirmScreen';
@@ -104,6 +105,7 @@ export default function HomeScreen({
   onRegisterStudent,
   onRecordMarks,
   onOpenCurriculum,
+  onOpenParentRequests,
   onRetry,
   onScanPress,
   onOpenStudent,
@@ -247,6 +249,19 @@ export default function HomeScreen({
                     icon={Exam}
                     variant="secondary"
                     onPress={onRecordMarks}
+                    style={styles.rollCallButton}
+                  />
+                ) : null}
+
+                {/* What parents have asked. Offered to the three posts a request may be addressed
+                    to; the server refuses anyone else regardless. Behind `parent_portal`, because a
+                    school without the portal has no parent able to ask. */}
+                {canDecideParentRequests(user) && featureOn(features, 'parent_portal') ? (
+                  <Button
+                    label={t('home.parentRequests')}
+                    icon={ClipboardText}
+                    variant="secondary"
+                    onPress={onOpenParentRequests}
                     style={styles.rollCallButton}
                   />
                 ) : null}

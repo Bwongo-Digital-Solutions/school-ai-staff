@@ -532,10 +532,29 @@ export const schoolApi = {
 
   /* Asking the office, which is not the same as being granted anything — see the server's
      parent_requests table. Nothing here opens a gate. */
-  parentAsk: ({ studentId, kind, reason, requestedFor }) =>
+  parentAsk: ({ studentId, kind, reason, requestedFor, addressedTo }) =>
     post('/api/functions/parent', {
-      action: 'request', studentId, kind, reason, requestedFor,
+      action: 'request', studentId, kind, reason, requestedFor, addressedTo,
     }),
+
+  /**
+   * Who a guardian may address a request to.
+   *
+   * Posts, not people: the list is built from the posts this school actually has somebody
+   * approved in, so a parent can never address a request to an empty desk. Names are not in it —
+   * "the Head Teacher" identifies the desk without identifying the person, and a guardian account
+   * is the least protected in a school.
+   */
+  /* The office side of the same table: what parents have asked, and answering it. Gated on the
+     server to the head teacher, the administrator and the Director of Studies. */
+  pendingParentRequests: () =>
+    post('/api/functions/parent-requests', { action: 'pending' }),
+
+  decideParentRequest: ({ requestId, approve, note }) =>
+    post('/api/functions/parent-requests', { action: 'decide', requestId, approve, note }),
+
+  parentApprovers: () =>
+    post('/api/functions/parent', { action: 'approvers' }).then((d) => (d && d.approvers) || []),
 
   markClasses: () =>
     post('/api/functions/marks', { action: 'roster' }).then((d) => (d && d.classes) || []),
