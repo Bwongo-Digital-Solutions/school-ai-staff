@@ -46,6 +46,7 @@ export const en = {
   'parent.pendingBody':
     'The office has your request and will confirm you are this child’s parent or guardian. '
     + 'You will see everything here as soon as they do.',
+  'parent.overview': 'At a glance',
   'parent.balance': 'Balance',
   'parent.attendance': 'Attendance',
   'parent.average': 'Average mark',

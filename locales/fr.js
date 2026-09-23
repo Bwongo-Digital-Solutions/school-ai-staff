@@ -40,6 +40,7 @@ export const fr = {
   'parent.pendingBody':
     'Le secrétariat a reçu votre demande et confirmera que vous êtes bien le parent ou le tuteur '
     + 'de cet enfant. Tout apparaîtra ici dès que ce sera fait.',
+  'parent.overview': "En bref",
   'parent.balance': 'Solde',
   'parent.attendance': 'Présence',
   'parent.average': 'Moyenne',
