@@ -51,6 +51,7 @@ export const fr = {
   'curriculum.otherCountry':
     "Cette école n'utilise pas un barème ougandais : ce guide décrit donc le programme d'un autre pays. Il est ici à titre de lecture, non de consigne.",
   'home.parentRequests': 'Demandes des parents',
+  'home.parentRequestsWaiting': { one: '{count} en attente', other: '{count} en attente' },
   'parentQueue.title': 'Demandes des parents',
   'parentQueue.loading': 'Chargement des demandes…',
   'parentQueue.failed': "Les demandes n'ont pas pu être chargées.",

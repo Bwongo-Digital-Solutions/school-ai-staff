@@ -9,6 +9,16 @@ export default function Button({
   variant = 'primary',
   disabled = false,
   loading = false,
+  /**
+   * A count to show after the label — how many things are waiting behind this button.
+   *
+   * Zero draws nothing rather than a `0`. A badge reading zero is a worse answer than no badge:
+   * it asks the reader to notice a figure and then to work out that it means "nothing here", and
+   * it makes the button look busy from the corner of the eye when it is not.
+   */
+  badge = 0,
+  /** What the count means, for a screen reader — the label alone reads as a bare number. */
+  badgeLabel,
   style,
 }) {
   const { colors } = useTheme();
@@ -18,11 +28,16 @@ export default function Button({
   const textColor =
     variant === 'secondary' ? colors.text : variant === 'danger' ? colors.status.red : colors.accent;
   const isDisabled = disabled || loading;
+  const count = Number(badge) > 0 ? Math.floor(Number(badge)) : 0;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      /* Spoken as one phrase. Without this the badge reads as a stray number after the label,
+         which is exactly the part a blind user cannot infer from position. */
+      accessibilityLabel={count ? `${label}, ${badgeLabel || count}` : label}
       style={({ pressed }) => [
         styles.base,
         variantStyle,
@@ -38,6 +53,11 @@ export default function Button({
           <Icon size={18} color={textColor} weight="regular" style={styles.icon} />
         ) : null}
         <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+        {count ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{count > 99 ? '99+' : String(count)}</Text>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -58,6 +78,24 @@ const createStyles = (colors) =>
     },
     icon: {
       marginRight: spacing.sm,
+    },
+    /* The same pill the message bell wears, so a count means the same thing wherever it appears:
+       accent on the button's own ground, the label reversed out of it. */
+    badge: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      marginLeft: spacing.sm,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeText: {
+      fontFamily: fonts.semibold,
+      fontSize: 11,
+      lineHeight: 20,
+      color: colors.bg,
     },
     primary: {
       borderWidth: 1,
