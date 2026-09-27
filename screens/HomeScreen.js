@@ -103,6 +103,7 @@ export default function HomeScreen({
   pendingGateCount = 0,
   pendingGateLoaded = false,
   onRegisterStudent,
+  parentRequestCount = 0,
   onRecordMarks,
   onOpenCurriculum,
   onOpenParentRequests,
@@ -262,6 +263,11 @@ export default function HomeScreen({
                     icon={ClipboardText}
                     variant="secondary"
                     onPress={onOpenParentRequests}
+                    /* Everything pending, not only what was addressed to this reader's post: any
+                       of the three may answer any of them, so a badge counting one post's share
+                       would sit quiet while a child waited on a colleague who is away. */
+                    badge={parentRequestCount}
+                    badgeLabel={t('home.parentRequestsWaiting', { count: parentRequestCount })}
                     style={styles.rollCallButton}
                   />
                 ) : null}
